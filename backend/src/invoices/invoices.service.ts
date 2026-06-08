@@ -1,0 +1,325 @@
+import { BadGatewayException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { NumberSequenceService } from '../common/number-sequence.service';
+import { PdfService } from '../pdf/pdf.service';
+import { S3Service } from '../uploads/s3.service';
+import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { buildInvoiceEmailHtml } from '../mail/templates/invoice-email.template';
+import { EventPublisherService } from '../events/event-publisher.service';
+
+@Injectable()
+export class InvoicesService {
+  constructor(
+    private prisma: PrismaService,
+    private numbers: NumberSequenceService,
+    private pdf: PdfService,
+    private s3: S3Service,
+    private mail: MailService,
+    private notifications: NotificationsService,
+    private activityLog: ActivityLogService,
+    private events: EventPublisherService,
+  ) {}
+
+  findAll() {
+    return this.prisma.invoice.findMany({
+      include: { customer: { select: { id: true, companyName: true } } },
+      orderBy: { invoiceDate: 'desc' },
+    });
+  }
+
+  findByCustomer(customerId: string) {
+    return this.prisma.invoice.findMany({ where: { customerId }, orderBy: { invoiceDate: 'desc' } });
+  }
+
+  async findOne(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { customer: true, payments: true },
+    });
+    if (!invoice) return null;
+    const pdfViewUrl = await this.resolvePdfViewUrl(invoice.pdfUrl);
+    return { ...invoice, pdfViewUrl };
+  }
+
+  /** Turn stored pdfUrl (S3 key, legacy local path, or old signed URL) into a browser-openable URL. */
+  async resolvePdfViewUrl(pdfUrl: string | null | undefined): Promise<string | null> {
+    if (!pdfUrl) return null;
+
+    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+      return pdfUrl;
+    }
+
+    let key = pdfUrl;
+    if (pdfUrl.startsWith('/api/uploads/local/')) {
+      key = pdfUrl.replace('/api/uploads/local/', '');
+      if (this.s3.localFileExists(key)) {
+        return this.s3.getAccessUrl(key);
+      }
+      return null;
+    }
+
+    if (key.startsWith('invoices/') || key.startsWith('files/')) {
+      return this.s3.getAccessUrl(key);
+    }
+
+    return null;
+  }
+
+  extractS3Key(pdfUrl: string | null | undefined): string | null {
+    if (!pdfUrl) return null;
+    if (pdfUrl.startsWith('/api/uploads/local/')) {
+      return pdfUrl.replace('/api/uploads/local/', '');
+    }
+    if (pdfUrl.startsWith('invoices/') || pdfUrl.startsWith('files/')) {
+      return pdfUrl;
+    }
+    return null;
+  }
+
+  async create(data: { customerId: string; lineItems: unknown[]; dueDate: Date; notes?: string; gstRate?: number }, createdById: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: data.customerId } });
+    const settings = await this.prisma.systemSettings.findUnique({ where: { id: 'default' } });
+    const gstRate = data.gstRate ?? Number(settings?.gstRate ?? 18);
+    const lineItems = data.lineItems as Array<{ name: string; qty: number; rate: number; amount: number }>;
+    const subtotal = lineItems.reduce((s, i) => s + i.amount, 0);
+    const gstAmount = Math.round(subtotal * gstRate) / 100;
+    const grandTotal = subtotal + gstAmount;
+    const invoiceNumber = await this.numbers.next('INV');
+
+    const invoice = await this.prisma.invoice.create({
+      data: {
+        invoiceNumber,
+        customerId: data.customerId,
+        dueDate: data.dueDate,
+        lineItems,
+        subtotal,
+        gstRate,
+        gstAmount,
+        grandTotal,
+        notes: data.notes,
+        createdById,
+      },
+      include: { customer: true },
+    });
+
+    const pdfBuffer = await this.pdf.generateInvoicePdf({
+      invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      dueDate: invoice.dueDate,
+      customer: {
+        companyName: customer?.companyName || '',
+        ownerName: customer?.ownerName,
+        phone: customer?.phone,
+        email: customer?.email,
+        address: customer?.address,
+        state: customer?.state,
+        pincode: customer?.pincode,
+        gstNumber: customer?.gstNumber,
+      },
+      lineItems,
+      subtotal: Number(subtotal),
+      gstAmount: Number(gstAmount),
+      grandTotal: Number(grandTotal),
+      gstRate,
+    });
+    const upload = await this.s3.upload(pdfBuffer, `${invoiceNumber}.pdf`, 'application/pdf', 'invoices');
+    await this.prisma.invoice.update({ where: { id: invoice.id }, data: { pdfUrl: upload.key } });
+
+    const admins = await this.prisma.user.findMany({ where: { role: 'SUPER_ADMIN' } });
+    await this.notifications.notifyMany(
+      admins.map((a) => a.id),
+      {
+        type: 'INVOICE_CREATED',
+        title: 'New invoice',
+        message: invoiceNumber,
+        link: `/invoices/${invoice.id}`,
+      },
+    );
+    await this.activityLog.log({
+      userId: createdById,
+      action: 'INVOICE_CREATED',
+      module: 'invoice',
+      recordId: invoice.id,
+      newValue: { invoiceNumber, customerId: data.customerId },
+    });
+    if (customer?.email) {
+      try {
+        await this.deliverInvoiceEmail(invoice, pdfBuffer);
+      } catch (err) {
+        // Invoice is created even if email fails — user can resend from detail page
+      }
+    }
+    return this.findOne(invoice.id);
+  }
+
+  private async getInvoicePdfBuffer(invoice: {
+    id: string;
+    invoiceNumber: string;
+    invoiceDate: Date;
+    dueDate: Date;
+    lineItems: unknown;
+    subtotal: unknown;
+    gstAmount: unknown;
+    grandTotal: unknown;
+    gstRate: unknown;
+    pdfUrl: string | null;
+    customer?: {
+      companyName?: string | null;
+      ownerName?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      address?: string | null;
+      state?: string | null;
+      pincode?: string | null;
+      gstNumber?: string | null;
+    } | null;
+  }) {
+    const key = this.extractS3Key(invoice.pdfUrl);
+    if (key) {
+      try {
+        return await this.s3.download(key);
+      } catch {
+        /* regenerate below */
+      }
+    }
+    const lineItems = invoice.lineItems as Array<{ name: string; qty: number; rate: number; amount: number }>;
+    return this.pdf.generateInvoicePdf({
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      dueDate: invoice.dueDate,
+      customer: {
+        companyName: invoice.customer?.companyName || '',
+        ownerName: invoice.customer?.ownerName,
+        phone: invoice.customer?.phone,
+        email: invoice.customer?.email,
+        address: invoice.customer?.address,
+        state: invoice.customer?.state,
+        pincode: invoice.customer?.pincode,
+        gstNumber: invoice.customer?.gstNumber,
+      },
+      lineItems,
+      subtotal: Number(invoice.subtotal),
+      gstAmount: Number(invoice.gstAmount),
+      grandTotal: Number(invoice.grandTotal),
+      gstRate: Number(invoice.gstRate),
+    });
+  }
+
+  private async deliverInvoiceEmail(
+    invoice: {
+      id: string;
+      invoiceNumber: string;
+      invoiceDate: Date;
+      dueDate: Date;
+      subtotal: unknown;
+      gstAmount: unknown;
+      grandTotal: unknown;
+      lineItems: unknown;
+      customer?: {
+        companyName?: string | null;
+        ownerName?: string | null;
+        email?: string | null;
+      } | null;
+    },
+    pdfBuffer: Buffer,
+  ) {
+    const email = invoice.customer?.email;
+    if (!email) throw new BadRequestException('Customer has no email address');
+
+    const lineItems = invoice.lineItems as Array<{ name: string; qty: number; rate: number; amount: number }>;
+    const html = buildInvoiceEmailHtml({
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      dueDate: invoice.dueDate,
+      subtotal: Number(invoice.subtotal),
+      gstAmount: Number(invoice.gstAmount),
+      grandTotal: Number(invoice.grandTotal),
+      customer: invoice.customer,
+      lineItems,
+    });
+
+    const result = await this.mail.send(
+      email,
+      `Invoice ${invoice.invoiceNumber} · ₹${Number(invoice.grandTotal).toLocaleString('en-IN')} due ${invoice.dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} — TechPotli`,
+      html,
+      [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }],
+    );
+
+    if ((result as { skipped?: boolean }).skipped) {
+      throw new BadGatewayException(
+        'Email is not configured. Add RESEND_API_KEY to backend/.env and restart the server.',
+      );
+    }
+
+    return result;
+  }
+
+  async regeneratePdf(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { customer: true },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+
+    const lineItems = invoice.lineItems as Array<{ name: string; qty: number; rate: number; amount: number }>;
+    const pdfBuffer = await this.pdf.generateInvoicePdf({
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      dueDate: invoice.dueDate,
+      customer: {
+        companyName: invoice.customer?.companyName || '',
+        ownerName: invoice.customer?.ownerName,
+        phone: invoice.customer?.phone,
+        email: invoice.customer?.email,
+        address: invoice.customer?.address,
+        state: invoice.customer?.state,
+        pincode: invoice.customer?.pincode,
+        gstNumber: invoice.customer?.gstNumber,
+      },
+      lineItems,
+      subtotal: Number(invoice.subtotal),
+      gstAmount: Number(invoice.gstAmount),
+      grandTotal: Number(invoice.grandTotal),
+      gstRate: Number(invoice.gstRate),
+    });
+    const oldKey = this.extractS3Key(invoice.pdfUrl);
+    const upload = await this.s3.upload(pdfBuffer, `${invoice.invoiceNumber}.pdf`, 'application/pdf', 'invoices');
+    if (oldKey && oldKey !== upload.key) {
+      await this.s3.delete(oldKey).catch(() => undefined);
+    }
+    await this.prisma.invoice.update({ where: { id }, data: { pdfUrl: upload.key } });
+    return this.findOne(id);
+  }
+
+  async sendEmail(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { customer: true },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (!invoice.customer?.email) {
+      throw new BadRequestException('Customer has no email address. Add email on the customer profile first.');
+    }
+
+    const pdfBuffer = await this.getInvoicePdfBuffer(invoice);
+    await this.deliverInvoiceEmail(invoice, pdfBuffer);
+
+    const updated = await this.prisma.invoice.update({
+      where: { id },
+      data: { status: 'SENT', emailSentAt: new Date() },
+    });
+    await this.events.invoiceSent(updated as unknown as Record<string, unknown>);
+    return { sent: true, to: invoice.customer.email };
+  }
+
+  update(id: string, data: Prisma.InvoiceUpdateInput) {
+    return this.prisma.invoice.update({ where: { id }, data });
+  }
+
+  remove(id: string) {
+    return this.prisma.invoice.delete({ where: { id } });
+  }
+}

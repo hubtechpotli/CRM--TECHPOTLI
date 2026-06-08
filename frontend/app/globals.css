@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f6f9;
+  --foreground: #0f172a;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --accent: #06b6d4;
+  --accent-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --sidebar: #1a163a;
+  --sidebar-foreground: #e0e7ff;
+  --sidebar-width: 16rem;
+}
+
+html.dark {
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --primary: #818cf8;
+  --primary-foreground: #ffffff;
+  --accent: #22d3ee;
+  --accent-foreground: #0f172a;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --border: #334155;
+  --card: #1e293b;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --sidebar: #0f172a;
+  --sidebar-foreground: #c7d2fe;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--primary) 30%, transparent) transparent;
+}

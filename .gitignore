@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.production
+backend/.env
+frontend/.env.local
+*.log
+.DS_Store
+coverage/
+.prisma/
+backend/.pgdata/

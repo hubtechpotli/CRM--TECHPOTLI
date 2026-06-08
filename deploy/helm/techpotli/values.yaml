@@ -1,0 +1,34 @@
+replicaCount: 2
+
+image:
+  api:
+    repository: techpotli-api
+    tag: latest
+  worker:
+    repository: techpotli-worker
+    tag: latest
+  frontend:
+    repository: techpotli-frontend
+    tag: latest
+
+ingress:
+  enabled: true
+  host: crm.techpotli.local
+
+postgres:
+  enabled: true
+
+redis:
+  enabled: true
+
+redpanda:
+  enabled: true
+
+ollama:
+  enabled: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70

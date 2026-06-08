@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "techpotli.fullname" . }}-worker
+  labels:
+    app: techpotli-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: techpotli-worker
+  template:
+    metadata:
+      labels:
+        app: techpotli-worker
+    spec:
+      containers:
+        - name: worker
+          image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag }}"
+          env:
+            - name: APP_MODE
+              value: worker
+            - name: ENABLE_CRON_JOBS
+              value: "true"
+            - name: ENABLE_KAFKA
+              value: "true"
+            - name: KAFKA_BROKERS
+              value: "redpanda:9092"
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: OLLAMA_BASE_URL
+              value: "http://ollama:11434"
