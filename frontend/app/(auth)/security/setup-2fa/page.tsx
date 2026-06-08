@@ -25,7 +25,12 @@ export default function Setup2faPage() {
     api
       .post<{ qrCode: string }>("/auth/2fa/setup-enroll", { setupToken })
       .then((res) => setQrCode(res.data.qrCode))
-      .catch(() => setError("Setup session expired. Please sign in again."));
+      .catch((err) => {
+        const message = isAxiosError(err)
+          ? (err.response?.data as { message?: string })?.message ?? err.message
+          : "Setup session expired. Please sign in again.";
+        setError(Array.isArray(message) ? message.join(", ") : String(message));
+      });
   }, [setupToken]);
 
   async function onSubmit(e: FormEvent) {

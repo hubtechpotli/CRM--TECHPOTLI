@@ -91,29 +91,29 @@ export class AuthService {
     const force2FA = settings?.force2FA ?? false;
 
     if (force2FA && !user!.twoFactorEnabled) {
-      const setupToken = uuidv4();
-      await this.redis.set(`2fa:enroll:${setupToken}`, user!.id, 600);
-      return { requires2FASetup: true, setupToken };
+      return {
+        requires2FASetup: true,
+        setupToken: this.createFlowToken(user!.id, '2fa-enroll', '15m'),
+      };
     }
 
     if (user!.twoFactorEnabled && user!.twoFactorSecret) {
-      const tempToken = uuidv4();
-      await this.redis.set(`2fa:temp:${tempToken}`, user!.id, 300);
-      return { requires2FA: true, tempToken };
+      return {
+        requires2FA: true,
+        tempToken: this.createFlowToken(user!.id, '2fa-verify', '5m'),
+      };
     }
 
     return this.issueTokens(user!, ip, userAgent);
   }
 
   async verify2fa(tempToken: string, code: string, ip: string, userAgent: string): Promise<AuthResult> {
-    const userId = await this.redis.get(`2fa:temp:${tempToken}`);
-    if (!userId) throw new UnauthorizedException('Session expired');
+    const userId = this.verifyFlowToken(tempToken, '2fa-verify');
 
     const attemptsKey = `2fa:attempts:${tempToken}`;
     const rawAttempts = await this.redis.get(attemptsKey);
     const attempts = parseInt(rawAttempts || '0', 10) || 0;
     if (attempts >= TWO_FA_ATTEMPTS) {
-      await this.redis.del(`2fa:temp:${tempToken}`);
       throw new UnauthorizedException('Too many attempts. Sign in again.');
     }
 
@@ -148,28 +148,34 @@ export class AuthService {
       throw new UnauthorizedException('Invalid OTP');
     }
 
-    await this.redis.del(`2fa:temp:${tempToken}`);
     await this.redis.del(attemptsKey);
     return this.issueTokens(user, ip, userAgent);
   }
 
   async setup2faEnroll(setupToken: string) {
-    const userId = await this.redis.get(`2fa:enroll:${setupToken}`);
-    if (!userId) throw new BadRequestException('Setup session expired. Sign in again.');
+    const userId = this.verifyFlowToken(setupToken, '2fa-enroll');
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.isActive || user.twoFactorEnabled) {
+      throw new BadRequestException('Setup session expired. Sign in again.');
+    }
 
     const secret = speakeasy.generateSecret({ name: 'TechPotli Business OS' });
     const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
-    await this.redis.set(`2fa:setup:${userId}`, secret.base32, 600);
-    await this.redis.set(`2fa:enroll:owner:${setupToken}`, userId, 600);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: this.encryption.encrypt(secret.base32) },
+    });
     return { secret: secret.base32, qrCode };
   }
 
   async confirm2faEnroll(setupToken: string, code: string, ip: string, userAgent: string): Promise<AuthResult> {
-    const userId = await this.redis.get(`2fa:enroll:owner:${setupToken}`);
-    if (!userId) throw new BadRequestException('Setup session expired. Sign in again.');
+    const userId = this.verifyFlowToken(setupToken, '2fa-enroll');
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.isActive || !user.twoFactorSecret) {
+      throw new BadRequestException('Setup expired. Start again.');
+    }
 
-    const secret = await this.redis.get(`2fa:setup:${userId}`);
-    if (!secret) throw new BadRequestException('Setup expired. Start again.');
+    const secret = this.encryption.decrypt(user.twoFactorSecret);
     const ok = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });
     if (!ok) throw new BadRequestException('Invalid code');
 
@@ -182,7 +188,7 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: {
         twoFactorSecret: this.encryption.encrypt(secret),
@@ -190,11 +196,7 @@ export class AuthService {
       },
     });
 
-    await this.redis.del(`2fa:setup:${userId}`);
-    await this.redis.del(`2fa:enroll:${setupToken}`);
-    await this.redis.del(`2fa:enroll:owner:${setupToken}`);
-
-    const tokens = await this.issueTokens(user, ip, userAgent);
+    const tokens = await this.issueTokens(updatedUser, ip, userAgent);
     return { ...tokens, backupCodes };
   }
 
@@ -312,6 +314,23 @@ export class AuthService {
       orderBy: { lastActiveAt: 'desc' },
     });
     return sessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
+  }
+
+  private createFlowToken(userId: string, typ: '2fa-enroll' | '2fa-verify', expiresIn: string) {
+    return this.jwt.sign({ sub: userId, typ }, { expiresIn });
+  }
+
+  private verifyFlowToken(token: string, typ: '2fa-enroll' | '2fa-verify'): string {
+    try {
+      const payload = this.jwt.verify(token) as { sub?: string; typ?: string };
+      if (!payload.sub || payload.typ !== typ) {
+        throw new UnauthorizedException('Session expired');
+      }
+      return payload.sub;
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new UnauthorizedException('Session expired');
+    }
   }
 
   private refreshLookup(token: string) {
