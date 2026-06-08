@@ -28,8 +28,9 @@ async function bootstrap() {
   });
 
   app.use(helmet());
+  const frontendUrl = (config.get<string>('FRONTEND_URL') || 'http://localhost:3000').replace(/\/$/, '');
   app.enableCors({
-    origin: config.get('FRONTEND_URL') || 'http://localhost:3000',
+    origin: frontendUrl,
     credentials: true,
   });
   app.setGlobalPrefix('api');
