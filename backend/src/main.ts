@@ -53,8 +53,8 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
-  const port = config.get('PORT') || 3001;
-  await app.listen(port);
+  const port = Number(process.env.PORT) || config.get<number>('PORT') || 3001;
+  await app.listen(port, '0.0.0.0');
 
   await warnIfNoOfficeIps(app.get(PrismaService));
 
@@ -66,4 +66,7 @@ async function bootstrap() {
   logger.log(`Metrics: http://localhost:${port}/api/metrics`);
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
+});
