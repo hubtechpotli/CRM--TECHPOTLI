@@ -14,9 +14,10 @@ export function getWsUrl(): string {
     const envOrigin = resolveWsOriginFromEnv();
     if (envOrigin) {
       try {
-        if (new URL(envOrigin).origin !== window.location.origin) {
-          return window.location.origin;
-        }
+        const parsed = new URL(envOrigin);
+        const isLocalHost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+        if (isLocalHost) return envOrigin;
+        if (parsed.origin !== window.location.origin) return window.location.origin;
         return envOrigin;
       } catch {
         return window.location.origin;

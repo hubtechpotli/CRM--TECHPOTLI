@@ -10,6 +10,7 @@ import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { StatusTabs } from "@/components/dashboard/status-tabs";
 import { CustomerListTable, type CustomerRow } from "@/components/customers/customer-queue-list";
+import { isTempId } from "@/lib/optimistic-mutation";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { SelectInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
@@ -191,7 +192,8 @@ export default function CustomersPage() {
           onCancel={() => setShowNewCustomer(false)}
           onSuccess={(data) => {
             setShowNewCustomer(false);
-            if (data.id) router.push(`/customers/${data.id}`);
+            const id = String(data.id ?? "");
+            if (id && !isTempId(id)) router.push(`/customers/${id}`);
           }}
         />
       </Modal>

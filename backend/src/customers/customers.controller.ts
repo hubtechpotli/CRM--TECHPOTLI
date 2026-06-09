@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CustomerStatus, CustomerWorkItemStatus, UserRole } from '@prisma/client';
 import { CustomersService } from './customers.service';
@@ -55,9 +55,13 @@ export class CustomersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    this.customers.trackRecentlyViewed(user.sub, id);
-    return this.customers.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    const customer = await this.customers.findOne(id);
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+    void this.customers.trackRecentlyViewed(user.sub, id);
+    return customer;
   }
 
   @Post()

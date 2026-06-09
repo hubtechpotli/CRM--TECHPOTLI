@@ -4,7 +4,9 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { isTempId } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { api } from "@/lib/api";
@@ -123,6 +125,7 @@ export default function CustomerDetailPage() {
       const res = await api.get<CustomerDetail>(`/customers/${id}`);
       return res.data;
     },
+    enabled: !isTempId(id),
   });
 
   const { data: favorites = [] } = useQuery({
@@ -176,10 +179,21 @@ export default function CustomerDetailPage() {
     if (tabParam === "teamWork") setTab("teamWork");
   }, [searchParams, id, router]);
 
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving new customer…</p>;
+  }
+
   if (isLoading) {
     return <CustomerDetailSkeleton />;
   }
   if (error || !data) {
+    if (isAxiosError(error) && !error.response) {
+      return (
+        <p className="text-sm text-red-500">
+          Cannot reach the API server. Start the backend with <code>npm run start:dev</code> in the backend folder.
+        </p>
+      );
+    }
     return <p className="text-sm text-red-500">Customer not found</p>;
   }
 

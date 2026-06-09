@@ -162,11 +162,15 @@ export class CustomersService {
   }
 
   async trackRecentlyViewed(userId: string, customerId: string) {
-    await this.prisma.customerRecentlyViewed.upsert({
-      where: { userId_customerId: { userId, customerId } },
-      create: { userId, customerId },
-      update: { viewedAt: new Date() },
-    });
+    try {
+      await this.prisma.customerRecentlyViewed.upsert({
+        where: { userId_customerId: { userId, customerId } },
+        create: { userId, customerId },
+        update: { viewedAt: new Date() },
+      });
+    } catch {
+      // Non-fatal: recently viewed is best-effort
+    }
     return { ok: true };
   }
 

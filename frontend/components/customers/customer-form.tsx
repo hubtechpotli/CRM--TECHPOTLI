@@ -161,7 +161,6 @@ export function CustomerForm({
       const tempId = createTempId();
       const optimistic = { id: tempId, ...body };
       appendToMatchingLists(queryClient, ["customers-directory"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -172,6 +171,7 @@ export function CustomerForm({
           context.tempId,
           data as { id: string },
         );
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {
