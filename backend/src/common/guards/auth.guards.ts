@@ -56,8 +56,9 @@ export class IpWhitelistGuard implements CanActivate {
     if (cachedOfficeCidrs && cachedOfficeCidrs.expiresAt > now) {
       return cachedOfficeCidrs.cidrs;
     }
+    const { parseEnvOfficeCidrs } = await import('../utils/ip.util');
     const allowed = await this.prisma.allowedOfficeIp.findMany({ where: { isActive: true } });
-    const cidrs = allowed.map((a) => a.cidr);
+    const cidrs = [...parseEnvOfficeCidrs(), ...allowed.map((a) => a.cidr)];
     cachedOfficeCidrs = { cidrs, expiresAt: now + 5 * 60_000 };
     return cidrs;
   }
@@ -79,18 +80,19 @@ export class IpWhitelistGuard implements CanActivate {
       request.ip ||
       '127.0.0.1';
 
-    const { ipMatchesCidr } = await import('../utils/ip.util');
+    const { ipMatchesCidr, normalizeClientIp } = await import('../utils/ip.util');
     const officeCidrs = await this.getOfficeCidrs();
     const userAllowed = request.user?.allowedIPs as string[] | undefined;
 
     const cidrs = [...officeCidrs, ...(userAllowed || [])];
     if (cidrs.length === 0) return true;
 
-    const ok = cidrs.some((c) => ipMatchesCidr(ip, c));
+    const normalizedIp = normalizeClientIp(ip);
+    const ok = cidrs.some((c) => ipMatchesCidr(normalizedIp, c));
     if (!ok) {
       await this.prisma.blockedAccessLog.create({
         data: {
-          ip,
+          ip: normalizedIp,
           userId: request.user?.sub,
           userAgent: request.headers['user-agent'],
           path: request.url,

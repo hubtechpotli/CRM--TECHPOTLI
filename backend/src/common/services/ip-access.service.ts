@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ipMatchesCidr } from '../utils/ip.util';
+import { ipMatchesCidr, normalizeClientIp, parseEnvOfficeCidrs } from '../utils/ip.util';
 
 type LoginUser = {
   id: string;
@@ -20,14 +20,18 @@ export class IpAccessService {
       where: { isActive: true },
       select: { cidr: true },
     });
-    const cidrs = [...office.map((o) => o.cidr), ...(user.allowedIPs || [])];
+    const cidrs = [
+      ...parseEnvOfficeCidrs(),
+      ...office.map((o) => o.cidr),
+      ...(user.allowedIPs || []),
+    ];
     if (cidrs.length === 0) return;
 
-    const normalizedIp = ip === '::1' ? '127.0.0.1' : ip.replace(/^::ffff:/, '');
+    const normalizedIp = normalizeClientIp(ip);
     const ok = cidrs.some((c) => ipMatchesCidr(normalizedIp, c));
     if (!ok) {
       throw new ForbiddenException(
-        'Login is only allowed from the office network. Contact your admin for remote access.',
+        `Login is only allowed from the office network. Contact your admin for remote access. (Your IP: ${normalizedIp})`,
       );
     }
   }

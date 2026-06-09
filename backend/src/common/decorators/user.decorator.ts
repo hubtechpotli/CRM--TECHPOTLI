@@ -1,4 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { normalizeClientIp } from '../utils/ip.util';
 
 export interface JwtPayload {
   sub: string;
@@ -18,9 +19,9 @@ export const CurrentUser = createParamDecorator(
 
 export const ClientIp = createParamDecorator((_data: unknown, ctx: ExecutionContext): string => {
   const request = ctx.switchToHttp().getRequest();
-  return (
+  const raw =
     (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
     request.ip ||
-    '127.0.0.1'
-  );
+    '127.0.0.1';
+  return normalizeClientIp(raw);
 });

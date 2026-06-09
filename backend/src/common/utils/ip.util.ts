@@ -1,5 +1,20 @@
+export function normalizeClientIp(ip: string): string {
+  const trimmed = ip.trim();
+  if (trimmed === '::1') return '127.0.0.1';
+  return trimmed.replace(/^::ffff:/, '');
+}
+
+export function parseEnvOfficeCidrs(): string[] {
+  const raw = process.env.ALLOWED_OFFICE_IPS?.trim();
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
 export function ipMatchesCidr(ip: string, cidr: string): boolean {
-  const normalized = ip === '::1' ? '127.0.0.1' : ip.replace(/^::ffff:/, '');
+  const normalized = normalizeClientIp(ip);
   if (!cidr.includes('/')) {
     return normalized === cidr || normalized === cidr.replace('/32', '');
   }
