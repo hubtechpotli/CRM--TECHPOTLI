@@ -14,25 +14,25 @@ export class UsersController {
   constructor(private users: UsersService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   findAll(@Query('role') role?: UserRole) {
     return this.users.findAll(role);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   findOne(@Param('id') id: string) {
     return this.users.findOne(id);
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   create(@CurrentUser() user: JwtPayload, @Body() body: CreateUserDto) {
     return this.users.create(body, user.role as UserRole);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.users.update(id, body, user.role as UserRole);
   }

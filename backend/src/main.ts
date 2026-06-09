@@ -29,8 +29,19 @@ async function bootstrap() {
 
   app.use(helmet());
   const frontendUrl = (config.get<string>('FRONTEND_URL') || 'http://localhost:3000').replace(/\/$/, '');
+  const isProduction = process.env.NODE_ENV === 'production';
   app.enableCors({
-    origin: frontendUrl,
+    origin: isProduction
+      ? frontendUrl
+      : (origin, callback) => {
+          const allowed =
+            !origin ||
+            origin === frontendUrl ||
+            /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/.test(
+              origin,
+            );
+          callback(null, allowed ? origin || frontendUrl : false);
+        },
     credentials: true,
   });
   app.setGlobalPrefix('api');
@@ -42,7 +53,6 @@ async function bootstrap() {
     }),
   );
 
-  const isProduction = process.env.NODE_ENV === 'production';
   if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('TechPotli Business OS API')

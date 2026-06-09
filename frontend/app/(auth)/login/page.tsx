@@ -76,10 +76,19 @@ export default function LoginPage() {
 
       setError("Unexpected response from server.");
     } catch (err) {
-      const message = isAxiosError(err)
-        ? (err.response?.data as { message?: string })?.message ?? err.message
-        : "Sign in failed";
-      setError(Array.isArray(message) ? message.join(", ") : String(message));
+      let message = "Sign in failed";
+      if (isAxiosError(err)) {
+        const apiMessage = (err.response?.data as { message?: string | string[] })?.message;
+        if (apiMessage) {
+          message = Array.isArray(apiMessage) ? apiMessage.join(", ") : apiMessage;
+        } else if (err.message === "Network Error") {
+          message =
+            "Cannot reach the API server. Start the backend (npm run start:dev in backend) and use http://localhost:3000";
+        } else {
+          message = err.message;
+        }
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }

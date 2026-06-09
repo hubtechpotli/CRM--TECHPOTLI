@@ -229,7 +229,16 @@ Without Redis, you will see a warning but the API still runs for normal CRM use.
 ### "Network Error" on login page
 
 - Backend is not running → start Terminal 2 (`npm run start:dev`)
-- Wrong API URL → check `frontend\.env.local` has `NEXT_PUBLIC_API_URL=http://localhost:3001/api`
+- Use **http://localhost:3000** (not the LAN IP like `10.x.x.x:3000`) — cross-origin requests can fail with "Network Error"
+- Recommended `frontend\.env.local` (same-origin proxy — avoids CORS):
+
+```env
+NEXT_PUBLIC_API_URL=/api
+API_PROXY_TARGET=http://localhost:3001
+NEXT_PUBLIC_WS_URL=http://localhost:3001
+```
+
+Restart the frontend after changing `.env.local` (`Ctrl+C`, then `npm run dev`)
 
 ### `Can't reach database server at localhost:5433`
 

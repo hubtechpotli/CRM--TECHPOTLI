@@ -13,7 +13,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { canAccessNav } from "@/lib/roles";
+import { canAccessNav, isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch } from "@/components/global-search";
@@ -116,6 +116,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
+  const superAdmin = isSuperAdmin(user?.role);
+
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => canAccessNav(user?.role, item.href)),
@@ -196,12 +198,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 side="top"
                 className="z-50 mb-2 w-48 rounded-xl border border-border bg-card p-1 shadow-lg"
               >
-                <DropdownMenu.Item
-                  onSelect={() => router.push("/settings")}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs outline-none focus:bg-muted"
-                >
-                  <Settings className="h-3.5 w-3.5" /> Settings
-                </DropdownMenu.Item>
+                {superAdmin ? (
+                  <DropdownMenu.Item
+                    onSelect={() => router.push("/settings")}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs outline-none focus:bg-muted"
+                  >
+                    <Settings className="h-3.5 w-3.5" /> Settings
+                  </DropdownMenu.Item>
+                ) : null}
                 <DropdownMenu.Item
                   onSelect={handleLogout}
                   className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs text-red-600 outline-none focus:bg-red-50 dark:focus:bg-red-950/30"
@@ -260,12 +264,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <Calendar className="h-4 w-4" />
                 </Link>
                 <NotificationBell />
-                <Link
-                  href="/settings"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                >
-                  <Settings className="h-4 w-4" />
-                </Link>
+                {superAdmin ? (
+                  <Link
+                    href="/settings"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Link>
+                ) : null}
                 <ThemeToggle />
               </div>
             </div>

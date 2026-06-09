@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { isSuperAdmin } from "@/lib/roles";
+import { useAuthStore } from "@/store/auth-store";
 
 type Salesperson = {
   id: string;
@@ -19,6 +21,8 @@ export function TopSalespeople({
   people: Salesperson[];
   loading?: boolean;
 }) {
+  const superAdmin = isSuperAdmin(useAuthStore((s) => s.user?.role));
+
   return (
     <SectionCard title="Top Salespeople">
       {loading ? (
@@ -55,12 +59,14 @@ export function TopSalespeople({
           ))}
         </ul>
       )}
-      <Link
-        href="/employees"
-        className="mt-4 flex w-full items-center justify-center rounded-xl border border-border py-2 text-xs font-medium text-primary transition hover:bg-primary/5"
-      >
-        View All Salespeople
-      </Link>
+      {superAdmin ? (
+        <Link
+          href="/employees"
+          className="mt-4 flex w-full items-center justify-center rounded-xl border border-border py-2 text-xs font-medium text-primary transition hover:bg-primary/5"
+        >
+          View All Salespeople
+        </Link>
+      ) : null}
     </SectionCard>
   );
 }

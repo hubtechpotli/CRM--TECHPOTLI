@@ -14,7 +14,6 @@ const NAV_BY_ROLE: Record<string, string[]> = {
     "/renewals",
     "/reports",
     "/support",
-    "/employees",
     "/team-updates",
     "/activity",
     "/notifications",
