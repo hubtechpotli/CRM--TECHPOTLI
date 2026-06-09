@@ -1,7 +1,7 @@
 export type AppRole = "SUPER_ADMIN" | "ADMIN" | "EMPLOYEE" | string;
 
 const NAV_BY_ROLE: Record<string, string[]> = {
-  EMPLOYEE: ["/dashboard", "/leads", "/customers", "/emails", "/projects", "/support", "/team-updates", "/notifications"],
+  EMPLOYEE: ["/dashboard", "/leads", "/customers", "/emails", "/projects", "/support", "/team-updates", "/notifications", "/profile"],
   ADMIN: [
     "/dashboard",
     "/leads",
@@ -17,6 +17,7 @@ const NAV_BY_ROLE: Record<string, string[]> = {
     "/team-updates",
     "/activity",
     "/notifications",
+    "/profile",
   ],
   SUPER_ADMIN: [
     "/dashboard",
@@ -37,6 +38,7 @@ const NAV_BY_ROLE: Record<string, string[]> = {
     "/team-updates",
     "/activity",
     "/notifications",
+    "/profile",
   ],
 };
 

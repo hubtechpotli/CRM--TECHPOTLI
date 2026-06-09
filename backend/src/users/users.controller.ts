@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Roles } from '../common/decorators/metadata.decorator';
 import { CurrentUser, JwtPayload } from '../common/decorators/user.decorator';
 import { RolesGuard } from '../common/guards/auth.guards';
@@ -35,6 +36,16 @@ export class UsersController {
   @Roles(UserRole.SUPER_ADMIN)
   update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.users.update(id, body, user.role as UserRole);
+  }
+
+  @Post(':id/reset-password')
+  @Roles(UserRole.SUPER_ADMIN)
+  resetPassword(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: ResetPasswordDto,
+  ) {
+    return this.users.resetPassword(user.sub, id, body);
   }
 
   @Delete(':id')

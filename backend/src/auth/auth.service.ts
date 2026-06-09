@@ -28,6 +28,7 @@ const REFRESH_GRACE_SECONDS = 30;
 type AuthUser = {
   id: string;
   email: string;
+  name: string;
   role: string;
   passwordHash?: string;
   isActive: boolean;
@@ -38,10 +39,21 @@ type AuthUser = {
   allowedIPs: string[];
 };
 
+const profileSelect = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  phone: true,
+  department: true,
+  designation: true,
+  mustChangePassword: true,
+} as const;
+
 export type AuthResult = {
   accessToken?: string;
   refreshToken?: string;
-  user?: { id: string; email: string; role: string; mustChangePassword?: boolean };
+  user?: { id: string; email: string; name: string; role: string; mustChangePassword?: boolean };
   sessionId?: string;
   requires2FA?: boolean;
   tempToken?: string;
@@ -321,6 +333,23 @@ export class AuthService {
     return { success: true };
   }
 
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: profileSelect,
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+    return user;
+  }
+
+  async updateProfile(userId: string, name: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { name: name.trim() },
+      select: profileSelect,
+    });
+  }
+
   async getSessions(userId: string, currentSessionId?: string) {
     const sessions = await this.prisma.userSession.findMany({
       where: { userId, expiresAt: { gt: new Date() } },
@@ -406,6 +435,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        name: user.name,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
       },
@@ -472,6 +502,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        name: user.name,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
       },

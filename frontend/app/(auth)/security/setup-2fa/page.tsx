@@ -46,7 +46,7 @@ export default function Setup2faPage() {
         accessToken?: string;
         sessionId?: string;
         backupCodes?: string[];
-        user?: { id: string; email: string; role: string; mustChangePassword?: boolean };
+        user?: { id: string; email: string; name?: string; role: string; mustChangePassword?: boolean };
       }>("/auth/2fa/confirm-enroll", { setupToken, code });
 
       if (data.backupCodes?.length) {
@@ -59,6 +59,7 @@ export default function Setup2faPage() {
           {
             id: data.user.id,
             email: data.user.email,
+            name: data.user.name,
             role: data.user.role,
             mustChangePassword: data.user.mustChangePassword,
           },

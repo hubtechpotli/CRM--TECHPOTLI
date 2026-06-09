@@ -4,6 +4,11 @@ import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RedisService } from '../redis/redis.service';
+import { SessionService } from '../redis/session.service';
+
+const REFRESH_TTL = 7 * 24 * 60 * 60;
 
 const userSelect = {
   id: true,
@@ -21,7 +26,11 @@ const userSelect = {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private sessions: SessionService,
+  ) {}
 
   findAssignees() {
     return this.prisma.user.findMany({
@@ -84,6 +93,33 @@ export class UsersService {
       },
       select: userSelect,
     });
+  }
+
+  async resetPassword(actorId: string, targetId: string, dto: ResetPasswordDto) {
+    if (actorId === targetId) {
+      throw new BadRequestException('Use Profile to change your own password');
+    }
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: targetId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const hash = await bcrypt.hash(dto.newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: targetId },
+      data: { passwordHash: hash, mustChangePassword: true },
+    });
+
+    const sessions = await this.prisma.userSession.findMany({ where: { userId: targetId } });
+    for (const s of sessions) {
+      await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, targetId, REFRESH_TTL);
+    }
+    await this.prisma.userSession.deleteMany({ where: { userId: targetId } });
+    await this.sessions.revokeAllUserSessions(targetId);
+
+    return { success: true };
   }
 
   async remove(id: string, actorId: string) {

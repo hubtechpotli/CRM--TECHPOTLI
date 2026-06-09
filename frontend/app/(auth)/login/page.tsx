@@ -18,7 +18,7 @@ type LoginResponse = {
   setupToken?: string;
   accessToken?: string;
   sessionId?: string;
-  user?: { id: string; email: string; role: string; mustChangePassword?: boolean };
+  user?: { id: string; email: string; name?: string; role: string; mustChangePassword?: boolean };
 };
 
 const inputClass =
@@ -59,6 +59,7 @@ export default function LoginPage() {
           {
             id: data.user.id,
             email: data.user.email,
+            name: data.user.name,
             role: data.user.role,
             mustChangePassword: data.user.mustChangePassword,
           },

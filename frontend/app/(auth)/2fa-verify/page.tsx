@@ -28,7 +28,7 @@ export default function TwoFactorVerifyPage() {
       const { data } = await api.post<{
         accessToken: string;
         sessionId?: string;
-        user: { id: string; email: string; role: string; mustChangePassword?: boolean };
+        user: { id: string; email: string; name?: string; role: string; mustChangePassword?: boolean };
       }>("/auth/2fa/verify", { tempToken, code });
 
       setPending2FA(false, null);
@@ -36,6 +36,7 @@ export default function TwoFactorVerifyPage() {
         {
           id: data.user.id,
           email: data.user.email,
+          name: data.user.name,
           role: data.user.role,
           mustChangePassword: data.user.mustChangePassword,
         },

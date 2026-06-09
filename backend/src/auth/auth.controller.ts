@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Headers, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto, Enroll2faDto, LoginDto, Setup2faDto, Verify2faDto } from './dto/auth.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public, SkipPasswordChange } from '../common/decorators/metadata.decorator';
 import { CurrentUser, ClientIp, JwtPayload } from '../common/decorators/user.decorator';
 import { clearRefreshCookie, getRefreshCookie, setRefreshCookie } from '../common/utils/cookie.util';
@@ -125,6 +126,13 @@ export class AuthController {
   @SkipPasswordChange()
   @Get('me')
   me(@CurrentUser() user: JwtPayload) {
-    return user;
+    return this.auth.getProfile(user.sub);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @SkipPasswordChange()
+  @Patch('me')
+  updateMe(@CurrentUser() user: JwtPayload, @Body() dto: UpdateProfileDto) {
+    return this.auth.updateProfile(user.sub, dto.name);
   }
 }

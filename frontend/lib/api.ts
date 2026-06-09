@@ -40,7 +40,7 @@ async function refreshAccessToken(): Promise<string | null> {
       .post<{
         accessToken?: string;
         sessionId?: string;
-        user?: { id: string; email: string; role: string; mustChangePassword?: boolean };
+        user?: { id: string; email: string; name?: string; role: string; mustChangePassword?: boolean };
       }>("/auth/refresh")
       .then((res) => {
         const { accessToken, sessionId, user } = res.data;
@@ -50,7 +50,13 @@ async function refreshAccessToken(): Promise<string | null> {
           store.setAccessToken(accessToken, sessionId ?? null, expiresInMs);
           if (user) {
             store.setAuth(
-              { id: user.id, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword },
+              {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                mustChangePassword: user.mustChangePassword,
+              },
               accessToken,
               sessionId ?? null,
               expiresInMs,

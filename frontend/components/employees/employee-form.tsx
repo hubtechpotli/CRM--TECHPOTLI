@@ -9,6 +9,8 @@ import { USER_ROLES } from "@/lib/types";
 import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { FormField, SelectInput, TextInput } from "@/components/ui/form-field";
+import { PasswordInput } from "@/components/ui/password-input";
+import { ResetPasswordForm } from "@/components/profile/reset-password-form";
 
 type EmployeeFormData = {
   name: string;
@@ -119,6 +121,7 @@ export function EmployeeForm({
   }
 
   return (
+    <div className="space-y-6">
     <form onSubmit={handleSubmit} className="space-y-4">
       {error ? (
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
@@ -132,7 +135,7 @@ export function EmployeeForm({
         </FormField>
         {!isEdit ? (
           <FormField label="Password" className="sm:col-span-2">
-            <TextInput value={form.password} onChange={(v) => set("password", v)} type="password" required />
+            <PasswordInput value={form.password} onChange={(v) => set("password", v)} required />
             <p className="mt-1 text-xs text-muted-foreground">
               Min 8 chars with uppercase, number, and special character
             </p>
@@ -193,5 +196,12 @@ export function EmployeeForm({
         </button>
       </div>
     </form>
+    {isEdit ? (
+      <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+        <h3 className="mb-3 text-sm font-semibold">Reset password</h3>
+        <ResetPasswordForm userId={String(employee!.id)} />
+      </div>
+    ) : null}
+    </div>
   );
 }

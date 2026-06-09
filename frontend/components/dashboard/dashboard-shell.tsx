@@ -11,6 +11,7 @@ import {
   LogOut,
   Plus,
   Settings,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canAccessNav, isSuperAdmin } from "@/lib/roles";
@@ -198,6 +199,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 side="top"
                 className="z-50 mb-2 w-48 rounded-xl border border-border bg-card p-1 shadow-lg"
               >
+                <DropdownMenu.Item
+                  onSelect={() => router.push("/profile")}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs outline-none focus:bg-muted"
+                >
+                  <User className="h-3.5 w-3.5" /> Profile
+                </DropdownMenu.Item>
                 {superAdmin ? (
                   <DropdownMenu.Item
                     onSelect={() => router.push("/settings")}
