@@ -30,7 +30,7 @@ export default function ChangePasswordPage() {
     try {
       await api.post("/auth/change-password", { currentPassword, newPassword });
       if (user && accessToken) {
-        setAuth({ ...user, mustChangePassword: false }, accessToken, sessionId);
+        setAuth({ ...user, mustChangePassword: false }, accessToken, sessionId, 14 * 60_000);
       }
       router.push("/dashboard");
     } catch (err) {

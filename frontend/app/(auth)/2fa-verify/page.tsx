@@ -41,6 +41,7 @@ export default function TwoFactorVerifyPage() {
         },
         data.accessToken,
         data.sessionId,
+        14 * 60_000,
       );
       if (data.user.mustChangePassword) {
         router.push("/security/change-password");

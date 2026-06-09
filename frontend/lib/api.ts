@@ -35,12 +35,14 @@ async function refreshAccessToken(): Promise<string | null> {
         const { accessToken, sessionId, user } = res.data;
         if (accessToken) {
           const store = useAuthStore.getState();
-          store.setAccessToken(accessToken, sessionId ?? null);
+          const expiresInMs = 14 * 60_000;
+          store.setAccessToken(accessToken, sessionId ?? null, expiresInMs);
           if (user) {
             store.setAuth(
               { id: user.id, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword },
               accessToken,
               sessionId ?? null,
+              expiresInMs,
             );
           }
           return accessToken;

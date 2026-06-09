@@ -300,6 +300,55 @@ docker compose -f docker-compose.prod.yml exec postgres psql -U techpotli techpo
 - Ensure `PUBLIC_API_URL` uses HTTPS in production (cookies require `Secure`)
 - Frontend must send credentials: API client uses `withCredentials: true` for refresh
 
+### Stay logged in after page refresh (Vercel + Railway)
+
+When the frontend and API are on **different domains**, the refresh cookie may not be sent. Use the built-in Next.js API proxy:
+
+| Variable | Platform | Example |
+|----------|----------|---------|
+| `NEXT_PUBLIC_API_URL` | Vercel | `/api` |
+| `API_PROXY_TARGET` | Vercel | `https://your-api.up.railway.app` |
+| `FRONTEND_URL` | Railway | `https://your-app.vercel.app` (no trailing slash) |
+
+Redeploy Vercel after setting env vars. The browser then calls `/api/*` on the same domain as the app, and the refresh cookie persists for **7 days per browser**.
+
+**Optional backend cookie overrides** (Railway):
+
+```env
+COOKIE_SAME_SITE=lax
+COOKIE_SECURE=true
+```
+
+Use `COOKIE_SAME_SITE=none` only if you cannot use the proxy and frontend/API hosts differ.
+
+### Add allowed office IP (e.g. remote worker)
+
+**Settings → Allowed office IPs** → CIDR `152.56.178.15/32`
+
+Or run on production DB immediately:
+
+```sql
+INSERT INTO "AllowedOfficeIp" (id, cidr, label, "isActive", "createdAt", "updatedAt")
+VALUES (gen_random_uuid(), '152.56.178.15/32', 'Ravi / Remote', true, NOW(), NOW());
+```
+
+`npm run db:seed` also seeds `127.0.0.1/32` and `152.56.178.15/32` on fresh databases.
+
+### Cookie verification checklist
+
+After login, open DevTools → Application → Cookies:
+
+| Check | Expected |
+|-------|----------|
+| Cookie name | `refreshToken` |
+| Domain | Same as your frontend URL |
+| Path | `/api` |
+| Secure | Yes (HTTPS) |
+| SameSite | `Lax` (same-origin proxy) or `None` (split-origin) |
+| HttpOnly | Yes |
+
+Test: login → press F5 on dashboard → should remain logged in. A different browser should require login again.
+
 ---
 
 ## Alternative: deploy without Docker

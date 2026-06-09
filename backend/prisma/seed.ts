@@ -71,21 +71,21 @@ async function main() {
 
   console.log('System settings created');
 
-  const existingIp = await prisma.allowedOfficeIp.findFirst({
-    where: { cidr: '127.0.0.1/32' },
-  });
+  const officeIps = [
+    { cidr: '127.0.0.1/32', label: 'Local Dev' },
+    { cidr: '152.56.178.15/32', label: 'Ravi / Remote' },
+  ];
 
-  if (!existingIp) {
-    await prisma.allowedOfficeIp.create({
-      data: {
-        cidr: '127.0.0.1/32',
-        label: 'Local Dev',
-        isActive: true,
-      },
-    });
-    console.log('Allowed office IP 127.0.0.1/32 created');
-  } else {
-    console.log('Allowed office IP already exists');
+  for (const { cidr, label } of officeIps) {
+    const existingIp = await prisma.allowedOfficeIp.findFirst({ where: { cidr } });
+    if (!existingIp) {
+      await prisma.allowedOfficeIp.create({
+        data: { cidr, label, isActive: true },
+      });
+      console.log(`Allowed office IP ${cidr} created`);
+    } else {
+      console.log(`Allowed office IP ${cidr} already exists`);
+    }
   }
 
   for (const prefix of NUMBER_PREFIXES) {

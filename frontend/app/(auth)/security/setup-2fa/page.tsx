@@ -64,6 +64,7 @@ export default function Setup2faPage() {
           },
           data.accessToken,
           data.sessionId,
+          14 * 60_000,
         );
         setSetupComplete(true);
       }

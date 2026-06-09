@@ -13,12 +13,31 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const pending2FA = useAuthStore((s) => s.pending2FA);
   const pending2FASetup = useAuthStore((s) => s.pending2FASetup);
+  const restoreSessionToken = useAuthStore((s) => s.restoreSessionToken);
   const [bootstrapping, setBootstrapping] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return;
+    }
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
     let cancelled = false;
     (async () => {
-      if (!accessToken) {
+      const cachedToken = restoreSessionToken();
+      if (cachedToken) {
+        if (!cancelled) setBootstrapping(false);
+        refreshAccessToken().catch(() => undefined);
+        return;
+      }
+
+      if (!useAuthStore.getState().accessToken) {
         const token = await refreshAccessToken();
         if (cancelled) return;
         if (!token) {
@@ -28,10 +47,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       }
       if (!cancelled) setBootstrapping(false);
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [hydrated, accessToken, restoreSessionToken]);
 
   useEffect(() => {
     if (bootstrapping) return;
@@ -53,7 +73,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [bootstrapping, accessToken, pending2FA, pending2FASetup, user, pathname, router]);
 
-  if (bootstrapping) {
+  if (!hydrated || bootstrapping) {
     return <AppShellSkeleton />;
   }
 

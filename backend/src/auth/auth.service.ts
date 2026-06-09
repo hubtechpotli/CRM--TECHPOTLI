@@ -23,6 +23,7 @@ const LOCKOUT_ATTEMPTS = 5;
 const LOCKOUT_TTL = 900;
 const TWO_FA_ATTEMPTS = 5;
 const REFRESH_TTL = 7 * 24 * 60 * 60;
+const REFRESH_GRACE_SECONDS = 30;
 
 type AuthUser = {
   id: string;
@@ -239,6 +240,19 @@ export class AuthService {
     const lookup = this.refreshLookup(refreshToken);
     const reuseUserId = await this.redis.get(`refresh:revoked:${lookup}`);
     if (reuseUserId) {
+      const grace = await this.getRefreshGrace(lookup);
+      if (grace) {
+        const graceSession = await this.prisma.userSession.findUnique({
+          where: { id: grace.sessionId },
+          include: { user: true },
+        });
+        if (graceSession && graceSession.user.isActive && graceSession.expiresAt > new Date()) {
+          const match = await bcrypt.compare(grace.refreshToken, graceSession.refreshTokenHash);
+          if (match) {
+            return this.tokensFromSession(graceSession.user, graceSession.id, grace.refreshToken);
+          }
+        }
+      }
       await this.revokeAllSessionsForUser(reuseUserId);
       throw new UnauthorizedException('Session invalidated due to suspicious activity');
     }
@@ -261,7 +275,14 @@ export class AuthService {
     await this.prisma.userSession.delete({ where: { id: session.id } });
     await this.sessions.revokeSession(session.id, session.userId);
 
-    return this.issueTokens(session.user, ip, userAgent);
+    const result = await this.issueTokens(session.user, ip, userAgent);
+    if (result.refreshToken && result.sessionId) {
+      await this.storeRefreshGrace(lookup, {
+        sessionId: result.sessionId,
+        refreshToken: result.refreshToken,
+      });
+    }
+    return result;
   }
 
   async logout(userId: string, sessionId?: string) {
@@ -335,6 +356,60 @@ export class AuthService {
 
   private refreshLookup(token: string) {
     return crypto.createHash('sha256').update(token).digest('hex').slice(0, 32);
+  }
+
+  private async storeRefreshGrace(
+    oldLookup: string,
+    data: { sessionId: string; refreshToken: string },
+  ): Promise<void> {
+    await this.redis.set(
+      `refresh:grace:${oldLookup}`,
+      JSON.stringify({ ...data, at: Date.now() }),
+      REFRESH_GRACE_SECONDS,
+    );
+  }
+
+  private async getRefreshGrace(
+    oldLookup: string,
+  ): Promise<{ sessionId: string; refreshToken: string; at: number } | null> {
+    const raw = await this.redis.get(`refresh:grace:${oldLookup}`);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { sessionId: string; refreshToken: string; at: number };
+      if (!parsed.sessionId || !parsed.refreshToken || !parsed.at) return null;
+      if (Date.now() - parsed.at > REFRESH_GRACE_SECONDS * 1000) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  private tokensFromSession(
+    user: AuthUser,
+    sessionId: string,
+    refreshToken: string,
+  ): AuthResult {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      sid: sessionId,
+    };
+    const accessToken = this.jwt.sign(payload, {
+      secret: this.config.get('JWT_ACCESS_SECRET'),
+      expiresIn: this.config.get('JWT_ACCESS_EXPIRES') || '15m',
+    });
+    return {
+      accessToken,
+      refreshToken,
+      sessionId,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        mustChangePassword: user.mustChangePassword,
+      },
+    };
   }
 
   private async revokeAllSessionsForUser(userId: string) {
