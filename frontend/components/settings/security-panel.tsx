@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { removeListItem } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -29,12 +31,20 @@ export function SecurityPanel() {
     },
   });
 
-  const revokeMutation = useMutation({
+  const sessionsKey = ["auth-sessions"] as const;
+
+  const revokeMutation = useOptimisticMutation({
     mutationFn: async (targetSessionId?: string) => {
       await api.post("/auth/logout", { sessionId: targetSessionId });
     },
+    snapshotKeys: [sessionsKey],
+    invalidateKeys: [sessionsKey],
+    onMutate: (targetSessionId) => {
+      if (targetSessionId) {
+        removeListItem(queryClient, sessionsKey, targetSessionId);
+      }
+    },
     onSuccess: (_data, targetSessionId) => {
-      queryClient.invalidateQueries({ queryKey: ["auth-sessions"] });
       if (!targetSessionId || targetSessionId === sessionId) {
         logout();
         window.location.href = "/login";

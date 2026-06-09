@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -33,14 +35,21 @@ export function CustomerQuickNotes({ customerId }: { customerId: string }) {
     },
   });
 
-  const createMutation = useMutation({
+  const notesKey = ["customer-internal-notes", customerId] as const;
+
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/customers/${customerId}/internal-notes`, { content: content.trim() });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-internal-notes", customerId] });
-      queryClient.invalidateQueries({ queryKey: ["customer-timeline", customerId] });
+    snapshotKeys: [notesKey],
+    invalidateKeys: [notesKey, ["customer-timeline", customerId]],
+    onMutate: () => {
+      appendListItem(queryClient, notesKey, {
+        id: createTempId(),
+        content: content.trim(),
+        createdAt: new Date().toISOString(),
+      });
       setShowAdd(false);
       setContent("");
       setError(null);

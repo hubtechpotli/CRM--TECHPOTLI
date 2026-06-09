@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import {
   CheckCircle2,
@@ -17,7 +19,6 @@ import { formatDateTime, formatLabel } from "@/lib/format";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
 import { isAdmin } from "@/lib/roles";
-import { invalidateTeamUpdates } from "@/lib/team-updates";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
@@ -138,15 +139,15 @@ export function CustomerWorkHub({
 
   const displayItems = compact ? items.slice(0, 5) : items;
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["customer-work-items", customerId] });
-    queryClient.invalidateQueries({ queryKey: ["customer-timeline", customerId] });
-    queryClient.invalidateQueries({ queryKey: ["customer-internal-notes", customerId] });
-    invalidateTeamUpdates(queryClient);
-    queryClient.invalidateQueries({ queryKey: ["customers-directory"] });
-  };
+  const workInvalidateKeys = [
+    ["customer-work-items", customerId],
+    ["customer-timeline", customerId],
+    ["customer-internal-notes", customerId],
+    ["customers-directory"],
+    ["team-updates-summary"],
+  ] as const;
 
-  const createMutation = useMutation({
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/customers/${customerId}/work-items`, {
         title: form.title.trim(),
@@ -158,8 +159,17 @@ export function CustomerWorkHub({
       });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [queryKey],
+    invalidateKeys: [...workInvalidateKeys],
+    onMutate: () => {
+      appendListItem(queryClient, queryKey, {
+        id: createTempId(),
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        category: form.category,
+        status: "OPEN",
+        createdAt: new Date().toISOString(),
+      });
       setShowForm(false);
       setFormError(null);
       setForm({
@@ -174,22 +184,30 @@ export function CustomerWorkHub({
     onError: (err) => setFormError(mutationError(err)),
   });
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async ({ itemId, status, note }: { itemId: string; status: string; note?: string }) => {
       const res = await api.patch(`/customers/${customerId}/work-items/${itemId}/status`, { status, note });
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [queryKey],
+    invalidateKeys: [...workInvalidateKeys],
+    onMutate: ({ itemId, status }) => {
+      patchListItem(queryClient, queryKey, itemId, { status });
+    },
   });
 
-  const updateMutation = useMutation({
+  const updateMutation = useOptimisticMutation({
     mutationFn: async ({ itemId, body, toStatus }: { itemId: string; body: string; toStatus?: string }) => {
       const res = await api.post(`/customers/${customerId}/work-items/${itemId}/updates`, { body, toStatus });
       return res.data;
     },
-    onSuccess: (_, vars) => {
-      invalidate();
-      setUpdateText((prev) => ({ ...prev, [vars.itemId]: "" }));
+    snapshotKeys: [queryKey],
+    invalidateKeys: [...workInvalidateKeys],
+    onMutate: ({ itemId, toStatus }) => {
+      const patch: Record<string, unknown> = {};
+      if (toStatus) patch.status = toStatus;
+      patchListItem(queryClient, queryKey, itemId, patch);
+      setUpdateText((prev) => ({ ...prev, [itemId]: "" }));
     },
   });
 

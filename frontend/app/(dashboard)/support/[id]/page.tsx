@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendDetailListItem, createTempId, patchDetailItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatDateTime, formatLabel } from "@/lib/format";
@@ -33,17 +35,19 @@ export default function SupportTicketDetailPage() {
     },
   });
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["support-ticket", id] });
-    queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
-  };
+  const ticketKey = ["support-ticket", id] as const;
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async (status: string) => {
       const res = await api.patch(`/support/tickets/${id}`, { status });
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [ticketKey],
+    invalidateKeys: [ticketKey, ["support-tickets"]],
+    onMutate: (status) => {
+      patchDetailItem(queryClient, ticketKey, { status });
+      setError(null);
+    },
     onError: (err) => {
       const message = isAxiosError(err)
         ? (err.response?.data as { message?: string | string[] })?.message ?? err.message
@@ -52,7 +56,7 @@ export default function SupportTicketDetailPage() {
     },
   });
 
-  const commentMutation = useMutation({
+  const commentMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/support/tickets/${id}/comments`, {
         body: comment.trim(),
@@ -60,8 +64,15 @@ export default function SupportTicketDetailPage() {
       });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [ticketKey],
+    invalidateKeys: [ticketKey, ["support-tickets"]],
+    onMutate: () => {
+      appendDetailListItem(queryClient, ticketKey, "comments", {
+        id: createTempId(),
+        body: comment.trim(),
+        isInternal,
+        createdAt: new Date().toISOString(),
+      });
       setComment("");
       setIsInternal(false);
       setError(null);

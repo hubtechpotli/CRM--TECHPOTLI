@@ -1,7 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import {
+  appendToMatchingLists,
+  createTempId,
+  patchDetailItem,
+  patchMatchingListItems,
+  replaceMatchingListItemId,
+} from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { LEAD_PRIORITIES, LEAD_SOURCES, SERVICE_TYPES } from "@/lib/types";
@@ -79,19 +87,23 @@ export function LeadForm({
     setForm(toFormData(lead));
   }, [lead]);
 
-  const mutation = useMutation({
+  function buildBody(payload: LeadFormData) {
+    return {
+      companyName: payload.companyName.trim(),
+      contactName: payload.contactName.trim(),
+      phone: payload.phone.trim(),
+      email: payload.email.trim() || undefined,
+      source: payload.source,
+      priority: payload.priority,
+      budget: payload.budget ? Number(payload.budget) : undefined,
+      remarks: payload.remarks.trim() || undefined,
+      interestedServices: payload.interestedServices.length ? payload.interestedServices : undefined,
+    };
+  }
+
+  const mutation = useOptimisticMutation({
     mutationFn: async (payload: LeadFormData) => {
-      const body = {
-        companyName: payload.companyName.trim(),
-        contactName: payload.contactName.trim(),
-        phone: payload.phone.trim(),
-        email: payload.email.trim() || undefined,
-        source: payload.source,
-        priority: payload.priority,
-        budget: payload.budget ? Number(payload.budget) : undefined,
-        remarks: payload.remarks.trim() || undefined,
-        interestedServices: payload.interestedServices.length ? payload.interestedServices : undefined,
-      };
+      const body = buildBody(payload);
       if (isEdit) {
         const res = await api.patch(`/leads/${lead!.id}`, body);
         return res.data;
@@ -99,11 +111,35 @@ export function LeadForm({
       const res = await api.post("/leads", body);
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
-      if (isEdit) queryClient.invalidateQueries({ queryKey: ["lead", String(lead!.id)] });
-      onSuccess?.(data);
+    snapshotKeys: () =>
+      isEdit
+        ? [["lead", String(lead!.id)], ["leads"]]
+        : [["leads"], ["leads-kanban"]],
+    invalidateKeys: [["leads"], ["leads-kanban"], ["lead", String(lead?.id ?? "")]],
+    onMutate: (payload) => {
+      const body = buildBody(payload);
+      if (isEdit) {
+        const leadId = String(lead!.id);
+        patchDetailItem(queryClient, ["lead", leadId], body);
+        patchMatchingListItems(queryClient, ["leads"], leadId, body);
+        onSuccess?.({ id: leadId, ...body });
+        return {};
+      }
+      const tempId = createTempId();
+      const optimistic = { id: tempId, status: "NEW", ...body };
+      appendToMatchingLists(queryClient, ["leads"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["leads"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

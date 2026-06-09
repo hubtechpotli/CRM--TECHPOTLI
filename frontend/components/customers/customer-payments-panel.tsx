@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Modal } from "@/components/ui/modal";
@@ -36,7 +38,9 @@ export function CustomerPaymentsPanel({ customerId }: { customerId: string }) {
     },
   });
 
-  const createMutation = useMutation({
+  const paymentsKey = ["customer-payments", customerId] as const;
+
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post("/payments", {
         customerId,
@@ -49,9 +53,15 @@ export function CustomerPaymentsPanel({ customerId }: { customerId: string }) {
       });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-payments", customerId] });
-      queryClient.invalidateQueries({ queryKey: ["payments"] });
+    snapshotKeys: [paymentsKey, ["payments"]],
+    invalidateKeys: [paymentsKey, ["payments"]],
+    onMutate: () => {
+      appendListItem(queryClient, paymentsKey, {
+        id: createTempId(),
+        totalAmount: Number(form.totalAmount),
+        paidAmount: form.paidAmount ? Number(form.paidAmount) : 0,
+        status: form.status,
+      });
       setShowAdd(false);
       setForm(emptyForm);
     },

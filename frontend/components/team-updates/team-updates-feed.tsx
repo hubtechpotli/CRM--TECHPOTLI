@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import {
   Building2,
@@ -17,7 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDateTime, formatLabel } from "@/lib/format";
-import { invalidateTeamUpdates, type GlobalWorkItem } from "@/lib/team-updates";
+import { type GlobalWorkItem } from "@/lib/team-updates";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
 import { isAdmin } from "@/lib/roles";
@@ -129,13 +131,14 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     enabled: showForm && !compact && Boolean(form.customerId),
   });
 
-  const invalidate = () => {
-    invalidateTeamUpdates(queryClient);
-    queryClient.invalidateQueries({ queryKey: ["customer-work-items"] });
-    queryClient.invalidateQueries({ queryKey: ["customers-directory"] });
-  };
+  const teamInvalidateKeys = [
+    ["team-updates-feed"],
+    ["team-updates-summary"],
+    ["customer-work-items"],
+    ["customers-directory"],
+  ] as const;
 
-  const createMutation = useMutation({
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/customers/${form.customerId}/work-items`, {
         title: form.title.trim(),
@@ -147,8 +150,17 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [queryKey],
+    invalidateKeys: [...teamInvalidateKeys],
+    onMutate: () => {
+      appendListItem(queryClient, queryKey, {
+        id: createTempId(),
+        title: form.title.trim(),
+        status: "OPEN",
+        category: form.category,
+        customer: { id: form.customerId },
+        createdAt: new Date().toISOString(),
+      });
       setShowForm(false);
       setFormError(null);
       setForm({
@@ -164,7 +176,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     onError: (err) => setFormError(mutationError(err)),
   });
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async ({
       customerId,
       itemId,
@@ -179,17 +191,22 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       const res = await api.patch(`/customers/${customerId}/work-items/${itemId}/status`, { status, note });
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [queryKey],
+    invalidateKeys: [...teamInvalidateKeys],
+    onMutate: ({ itemId, status }) => {
+      patchListItem(queryClient, queryKey, itemId, { status });
+    },
   });
 
-  const updateMutation = useMutation({
+  const updateMutation = useOptimisticMutation({
     mutationFn: async ({ customerId, itemId, body }: { customerId: string; itemId: string; body: string }) => {
       const res = await api.post(`/customers/${customerId}/work-items/${itemId}/updates`, { body });
       return res.data;
     },
-    onSuccess: (_, vars) => {
-      invalidate();
-      setUpdateText((prev) => ({ ...prev, [vars.itemId]: "" }));
+    snapshotKeys: [queryKey],
+    invalidateKeys: [...teamInvalidateKeys],
+    onMutate: ({ itemId }) => {
+      setUpdateText((prev) => ({ ...prev, [itemId]: "" }));
     },
   });
 

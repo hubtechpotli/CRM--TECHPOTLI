@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -30,7 +32,9 @@ export function CustomerCallLogsPanel({ customerId }: { customerId: string }) {
     },
   });
 
-  const createMutation = useMutation({
+  const logsKey = ["customer-call-logs", customerId] as const;
+
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/customers/${customerId}/call-logs`, {
         notes: form.notes.trim(),
@@ -38,9 +42,15 @@ export function CustomerCallLogsPanel({ customerId }: { customerId: string }) {
       });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-call-logs", customerId] });
-      queryClient.invalidateQueries({ queryKey: ["customer-timeline", customerId] });
+    snapshotKeys: [logsKey],
+    invalidateKeys: [logsKey, ["customer-timeline", customerId]],
+    onMutate: () => {
+      appendListItem(queryClient, logsKey, {
+        id: createTempId(),
+        notes: form.notes.trim(),
+        followUpDate: form.followUpDate || null,
+        createdAt: new Date().toISOString(),
+      });
       setShowAdd(false);
       setForm(emptyForm);
     },

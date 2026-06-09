@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
@@ -35,7 +37,7 @@ export function RenewalForm({
     },
   });
 
-  const mutation = useMutation({
+  const mutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post("/renewals", {
         customerId: form.customerId,
@@ -46,9 +48,29 @@ export function RenewalForm({
       });
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["renewals"] });
-      onSuccess?.(data);
+    snapshotKeys: [["renewals"]],
+    invalidateKeys: [["renewals"]],
+    onMutate: () => {
+      const tempId = createTempId();
+      const optimistic = {
+        id: tempId,
+        customerId: form.customerId,
+        type: form.type,
+        renewalDate: form.renewalDate,
+      };
+      appendToMatchingLists(queryClient, ["renewals"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["renewals"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

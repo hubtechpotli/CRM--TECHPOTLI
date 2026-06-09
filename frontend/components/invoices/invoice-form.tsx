@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
@@ -35,7 +37,7 @@ export function InvoiceForm({
     },
   });
 
-  const mutation = useMutation({
+  const mutation = useOptimisticMutation({
     mutationFn: async () => {
       const items = lineItems
         .filter((i) => i.name.trim())
@@ -54,9 +56,24 @@ export function InvoiceForm({
       });
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      onSuccess?.(data);
+    snapshotKeys: [["invoices"]],
+    invalidateKeys: [["invoices"]],
+    onMutate: () => {
+      const tempId = createTempId();
+      const optimistic = { id: tempId, customerId, status: "DRAFT", dueDate };
+      appendToMatchingLists(queryClient, ["invoices"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["invoices"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

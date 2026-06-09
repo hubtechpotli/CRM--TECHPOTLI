@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchListItem, removeListItem } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -65,7 +67,9 @@ export function CustomerHostingPanel({ customerId }: { customerId: string }) {
     },
   });
 
-  const saveMutation = useMutation({
+  const hostingKey = ["customer-hosting", customerId] as const;
+
+  const saveMutation = useOptimisticMutation({
     mutationFn: async () => {
       const body = toBody(form);
       if (editing) {
@@ -75,21 +79,29 @@ export function CustomerHostingPanel({ customerId }: { customerId: string }) {
       const res = await api.post(`/customers/${customerId}/hosting`, body);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-hosting", customerId] });
-      queryClient.invalidateQueries({ queryKey: ["customer-timeline", customerId] });
+    snapshotKeys: [hostingKey],
+    invalidateKeys: [hostingKey, ["customer-timeline", customerId]],
+    onMutate: () => {
+      const body = toBody(form);
+      if (editing) {
+        patchListItem(queryClient, hostingKey, String(editing.id), body);
+      } else {
+        appendListItem(queryClient, hostingKey, { id: createTempId(), ...body });
+      }
       setShowModal(false);
       setEditing(null);
       setForm(emptyForm);
     },
   });
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: async (hostId: string) => {
       await api.delete(`/customers/${customerId}/hosting/${hostId}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-hosting", customerId] });
+    snapshotKeys: [hostingKey],
+    invalidateKeys: [hostingKey],
+    onMutate: (hostId) => {
+      removeListItem(queryClient, hostingKey, hostId);
     },
   });
 

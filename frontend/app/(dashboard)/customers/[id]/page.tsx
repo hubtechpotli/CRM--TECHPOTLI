@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { api } from "@/lib/api";
@@ -109,7 +110,6 @@ export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const id = String(params.id);
   const [tab, setTab] = useState<Tab>("overview");
   const [showProject, setShowProject] = useState(false);
@@ -149,14 +149,21 @@ export default function CustomerDetailPage() {
     },
   });
 
-  const favoriteMutation = useMutation({
+  const favoriteMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post<{ favorited: boolean }>(`/customers/${id}/favorite`);
       return res.data;
     },
+    snapshotKeys: [["customer-favorites"]],
+    invalidateKeys: [["customer-favorites"]],
+    onMutate: () => {
+      setFavorited((prev) => !prev);
+    },
     onSuccess: (result) => {
       setFavorited(result.favorited);
-      queryClient.invalidateQueries({ queryKey: ["customer-favorites"] });
+    },
+    onError: () => {
+      setFavorited((prev) => !prev);
     },
   });
 

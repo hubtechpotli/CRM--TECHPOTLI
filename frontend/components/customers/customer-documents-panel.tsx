@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel } from "@/lib/format";
 import { DOCUMENT_TYPES } from "@/lib/types";
@@ -44,7 +46,9 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
     }
   };
 
-  const uploadMutation = useMutation({
+  const docsKey = ["customer-documents", customerId] as const;
+
+  const uploadMutation = useOptimisticMutation({
     mutationFn: async () => {
       if (!selectedFile) throw new Error("No file selected");
       const formData = new FormData();
@@ -61,9 +65,15 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
       });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-documents", customerId] });
-      queryClient.invalidateQueries({ queryKey: ["customer-timeline", customerId] });
+    snapshotKeys: [docsKey],
+    invalidateKeys: [docsKey, ["customer-timeline", customerId]],
+    onMutate: () => {
+      appendListItem(queryClient, docsKey, {
+        id: createTempId(),
+        documentType: form.documentType,
+        filename: selectedFile?.name ?? "Uploading…",
+        customName: form.customName.trim() || undefined,
+      });
       setShowUpload(false);
       setForm(emptyForm);
       setSelectedFile(null);

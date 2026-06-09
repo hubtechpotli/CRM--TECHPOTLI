@@ -1,7 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import {
+  appendToMatchingLists,
+  createTempId,
+  patchDetailItem,
+  replaceMatchingListItemId,
+} from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
@@ -100,32 +107,37 @@ export function CustomerForm({
     setForm(toFormData(customer));
   }, [customer]);
 
-  const mutation = useMutation({
+  function buildBody(payload: CustomerFormData) {
+    const body: Record<string, unknown> = {
+      companyName: payload.companyName.trim(),
+      ownerName: payload.ownerName.trim(),
+      phone: payload.phone.trim(),
+      email: payload.email.trim() || undefined,
+      alternatePhone: payload.alternatePhone.trim() || undefined,
+      address: payload.address.trim() || undefined,
+      pincode: payload.pincode.trim() || undefined,
+      state: payload.state.trim() || undefined,
+      gstNumber: payload.gstNumber.trim() || undefined,
+      natureOfBusiness: payload.natureOfBusiness.trim() || undefined,
+      domain: payload.domain.trim() || undefined,
+      hosting: payload.hosting.trim() || undefined,
+      vercalLink: payload.vercalLink.trim() || undefined,
+      liveWebsiteLink: payload.liveWebsiteLink.trim() || undefined,
+      referenceWebsiteLink: payload.referenceWebsiteLink.trim() || undefined,
+      facebookUrl: payload.facebookUrl.trim() || undefined,
+      instagramUrl: payload.instagramUrl.trim() || undefined,
+      youtubeUrl: payload.youtubeUrl.trim() || undefined,
+      remarks: payload.remarks.trim() || undefined,
+    };
+    if (payload.assignedEmployeeId) {
+      body.assignedEmployee = { connect: { id: payload.assignedEmployeeId } };
+    }
+    return body;
+  }
+
+  const mutation = useOptimisticMutation({
     mutationFn: async (payload: CustomerFormData) => {
-      const body: Record<string, unknown> = {
-        companyName: payload.companyName.trim(),
-        ownerName: payload.ownerName.trim(),
-        phone: payload.phone.trim(),
-        email: payload.email.trim() || undefined,
-        alternatePhone: payload.alternatePhone.trim() || undefined,
-        address: payload.address.trim() || undefined,
-        pincode: payload.pincode.trim() || undefined,
-        state: payload.state.trim() || undefined,
-        gstNumber: payload.gstNumber.trim() || undefined,
-        natureOfBusiness: payload.natureOfBusiness.trim() || undefined,
-        domain: payload.domain.trim() || undefined,
-        hosting: payload.hosting.trim() || undefined,
-        vercalLink: payload.vercalLink.trim() || undefined,
-        liveWebsiteLink: payload.liveWebsiteLink.trim() || undefined,
-        referenceWebsiteLink: payload.referenceWebsiteLink.trim() || undefined,
-        facebookUrl: payload.facebookUrl.trim() || undefined,
-        instagramUrl: payload.instagramUrl.trim() || undefined,
-        youtubeUrl: payload.youtubeUrl.trim() || undefined,
-        remarks: payload.remarks.trim() || undefined,
-      };
-      if (payload.assignedEmployeeId) {
-        body.assignedEmployee = { connect: { id: payload.assignedEmployeeId } };
-      }
+      const body = buildBody(payload);
       if (isEdit) {
         const res = await api.patch(`/customers/${customer!.id}`, body);
         return res.data;
@@ -133,11 +145,34 @@ export function CustomerForm({
       const res = await api.post("/customers", body);
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["customers-directory"] });
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
-      if (isEdit) queryClient.invalidateQueries({ queryKey: ["customer", String(customer!.id)] });
-      onSuccess?.(data);
+    snapshotKeys: () =>
+      isEdit
+        ? [["customer", String(customer!.id)], ["customers-directory"]]
+        : [["customers-directory"]],
+    invalidateKeys: [["customers-directory"], ["customers"], ["customer", String(customer?.id ?? "")]],
+    onMutate: (payload) => {
+      const body = buildBody(payload);
+      if (isEdit) {
+        const customerId = String(customer!.id);
+        patchDetailItem(queryClient, ["customer", customerId], body);
+        onSuccess?.({ id: customerId, ...body });
+        return {};
+      }
+      const tempId = createTempId();
+      const optimistic = { id: tempId, ...body };
+      appendToMatchingLists(queryClient, ["customers-directory"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["customers-directory"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

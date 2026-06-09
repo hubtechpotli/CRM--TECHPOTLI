@@ -2,7 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendDetailListItem, createTempId, patchDetailItem } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
@@ -48,40 +50,57 @@ export default function ProjectDetailPage() {
     },
   });
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["project", id] });
-    queryClient.invalidateQueries({ queryKey: ["projects"] });
-    queryClient.invalidateQueries({ queryKey: ["projects-kanban"] });
-  };
+  const projectKey = ["project", id] as const;
 
-  const acceptMutation = useMutation({
+  const acceptMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.patch(`/projects/${id}/work-order/accept`);
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [projectKey],
+    invalidateKeys: [projectKey, ["projects"], ["projects-kanban"]],
+    onMutate: () => {
+      queryClient.setQueryData(projectKey, (old: ProjectDetail | undefined) => {
+        if (!old) return old;
+        const wo = (old.workOrder ?? {}) as Record<string, unknown>;
+        return {
+          ...old,
+          workOrder: { ...wo, status: "ACCEPTED", acceptedAt: new Date().toISOString() },
+        };
+      });
+    },
   });
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async (status: string) => {
       const res = await api.patch(`/projects/${id}/status`, { status });
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [projectKey],
+    invalidateKeys: [projectKey, ["projects"], ["projects-kanban"]],
+    onMutate: (status) => {
+      patchDetailItem(queryClient, projectKey, { status });
+    },
   });
 
-  const commentMutation = useMutation({
+  const commentMutation = useOptimisticMutation({
     mutationFn: async (body: string) => {
       const res = await api.post(`/projects/${id}/comments`, { body });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [projectKey],
+    invalidateKeys: [projectKey],
+    onMutate: (body) => {
+      appendDetailListItem(queryClient, projectKey, "comments", {
+        id: createTempId(),
+        body,
+        createdAt: new Date().toISOString(),
+      });
       setComment("");
     },
   });
 
-  const timeLogMutation = useMutation({
+  const timeLogMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/projects/${id}/time-logs`, {
         startTime: new Date(timeLog.startTime).toISOString(),
@@ -90,8 +109,15 @@ export default function ProjectDetailPage() {
       });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [projectKey],
+    invalidateKeys: [projectKey],
+    onMutate: () => {
+      appendDetailListItem(queryClient, projectKey, "timeLogs", {
+        id: createTempId(),
+        startTime: timeLog.startTime,
+        endTime: timeLog.endTime || null,
+        notes: timeLog.notes.trim() || null,
+      });
       setTimeLog({ startTime: "", endTime: "", notes: "" });
     },
   });

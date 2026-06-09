@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { PROJECT_PRIORITIES, SERVICE_TYPES } from "@/lib/types";
@@ -66,7 +68,7 @@ export function ProjectForm({
     }
   }, [defaultCustomerId]);
 
-  const mutation = useMutation({
+  const mutation = useOptimisticMutation({
     mutationFn: async (payload: ProjectFormData) => {
       const body: Record<string, unknown> = {
         name: payload.name.trim(),
@@ -83,10 +85,34 @@ export function ProjectForm({
       const res = await api.post("/projects", body);
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      if (form.customerId) queryClient.invalidateQueries({ queryKey: ["customer", form.customerId] });
-      onSuccess?.(data);
+    snapshotKeys: [["projects"], ["projects-kanban"]],
+    invalidateKeys: (payload) => [
+      ["projects"],
+      ["projects-kanban"],
+      ["customer", payload.customerId],
+    ],
+    onMutate: (payload) => {
+      const tempId = createTempId();
+      const optimistic = {
+        id: tempId,
+        name: payload.name.trim(),
+        status: "NEW",
+        serviceType: payload.serviceType,
+        priority: payload.priority,
+      };
+      appendToMatchingLists(queryClient, ["projects"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["projects"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

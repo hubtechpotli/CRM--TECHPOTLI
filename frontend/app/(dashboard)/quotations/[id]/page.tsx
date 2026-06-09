@@ -1,7 +1,9 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { patchDetailItem } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -34,14 +36,17 @@ export default function QuotationDetailPage() {
     },
   });
 
-  const statusMutation = useMutation({
+  const quotationKey = ["quotation", id] as const;
+
+  const statusMutation = useOptimisticMutation({
     mutationFn: async (status: string) => {
       const res = await api.patch(`/quotations/${id}`, { status });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotation", id] });
-      queryClient.invalidateQueries({ queryKey: ["quotations"] });
+    snapshotKeys: [quotationKey],
+    invalidateKeys: [quotationKey, ["quotations"]],
+    onMutate: (status) => {
+      patchDetailItem(queryClient, quotationKey, { status });
     },
   });
 

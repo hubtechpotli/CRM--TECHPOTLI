@@ -212,26 +212,18 @@ export class LeadsService {
       delete (data as Prisma.LeadUncheckedUpdateInput).assignedAt;
     }
 
-    if (data.status && data.status !== lead.status) {
-      await this.prisma.leadStatusHistory.create({
-        data: {
-          leadId: id,
-          fromStatus: lead.status,
-          toStatus: data.status as LeadStatus,
-          changedById: userId,
-        },
-      });
-      await this.activityLog.log({
-        userId,
-        action: 'LEAD_STATUS_CHANGED',
-        module: 'lead',
-        recordId: id,
-        oldValue: { status: lead.status },
-        newValue: { status: data.status },
-      });
-    }
+    const statusChanged =
+      data.status && data.status !== lead.status
+        ? { from: lead.status, to: data.status as LeadStatus }
+        : null;
+
     const updated = await this.prisma.lead.update({ where: { id }, data });
-    await this.invalidateKanbanCache();
+    void this.invalidateKanbanCache();
+
+    if (statusChanged) {
+      void this.recordLeadStatusChange(id, userId, statusChanged.from, statusChanged.to);
+    }
+
     return updated;
   }
 
@@ -353,5 +345,29 @@ export class LeadsService {
     this.asyncProcessing.onLeadConverted(customer);
     await this.invalidateKanbanCache();
     return customer;
+  }
+
+  private async recordLeadStatusChange(
+    leadId: string,
+    userId: string,
+    fromStatus: LeadStatus,
+    toStatus: LeadStatus,
+  ) {
+    await this.prisma.leadStatusHistory.create({
+      data: {
+        leadId,
+        fromStatus,
+        toStatus,
+        changedById: userId,
+      },
+    });
+    await this.activityLog.log({
+      userId,
+      action: 'LEAD_STATUS_CHANGED',
+      module: 'lead',
+      recordId: leadId,
+      oldValue: { status: fromStatus },
+      newValue: { status: toStatus },
+    });
   }
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
@@ -34,13 +36,17 @@ export default function ExpensesPage() {
     },
   });
 
-  const approveMutation = useMutation({
+  const approveMutation = useOptimisticMutation({
     mutationFn: async ({ id, action }: { id: string; action: "approve" | "reject" }) => {
       const res = await api.patch(`/expenses/${id}/${action}`);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    snapshotKeys: [["expenses"]],
+    invalidateKeys: [["expenses"]],
+    onMutate: ({ id, action }) => {
+      patchListItem(queryClient, ["expenses"], id, {
+        status: action === "approve" ? "APPROVED" : "REJECTED",
+      });
       setActionError(null);
     },
     onError: (err) => {

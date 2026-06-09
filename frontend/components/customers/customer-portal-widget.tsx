@@ -1,6 +1,8 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -28,33 +30,56 @@ export function CustomerPortalWidget({ customerId }: { customerId: string }) {
   const activeAccess = accessList.find((a) => !a.isRevoked);
   const totalVisits = accessList.reduce((sum, a) => sum + (a.visitCount ?? 0), 0);
 
-  const createMutation = useMutation({
+  const portalKey = ["customer-portal", customerId] as const;
+
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post<{ token: string }>(`/customers/${customerId}/portal`);
       return res.data;
     },
+    snapshotKeys: [portalKey],
+    invalidateKeys: [portalKey],
+    onMutate: () => {
+      appendListItem(queryClient, portalKey, {
+        id: createTempId(),
+        token: "…",
+        isRevoked: false,
+        visitCount: 0,
+        createdAt: new Date().toISOString(),
+      });
+    },
     onSuccess: async (data) => {
-      queryClient.invalidateQueries({ queryKey: ["customer-portal", customerId] });
       const url = `${window.location.origin}/portal/${data.token}`;
       await navigator.clipboard.writeText(url);
     },
   });
 
-  const revokeMutation = useMutation({
+  const revokeMutation = useOptimisticMutation({
     mutationFn: async (accessId?: string) => {
       const res = await api.patch(`/customers/${customerId}/portal/revoke`, accessId ? { accessId } : {});
       return res.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customer-portal", customerId] }),
+    snapshotKeys: [portalKey],
+    invalidateKeys: [portalKey],
+    onMutate: (accessId) => {
+      if (accessId) {
+        patchListItem(queryClient, portalKey, accessId, { isRevoked: true });
+      } else {
+        queryClient.setQueryData(portalKey, (old: PortalAccess[] | undefined) =>
+          Array.isArray(old) ? old.map((a) => ({ ...a, isRevoked: true })) : old,
+        );
+      }
+    },
   });
 
-  const regenerateMutation = useMutation({
+  const regenerateMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.patch<{ token: string }>(`/customers/${customerId}/portal/regenerate`);
       return res.data;
     },
+    snapshotKeys: [portalKey],
+    invalidateKeys: [portalKey],
     onSuccess: async (data) => {
-      queryClient.invalidateQueries({ queryKey: ["customer-portal", customerId] });
       const url = `${window.location.origin}/portal/${data.token}`;
       await navigator.clipboard.writeText(url);
     },

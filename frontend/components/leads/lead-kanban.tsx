@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { moveKanbanCard } from "@/lib/optimistic-mutation";
 import {
   DndContext,
   DragEndEvent,
@@ -201,14 +203,19 @@ export function LeadKanban({ showSalesPerson = false }: { showSalesPerson?: bool
     },
   });
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async ({ leadId, status }: { leadId: string; status: string }) => {
       const res = await api.patch(`/leads/${leadId}`, { status });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    snapshotKeys: [["leads-kanban"]],
+    invalidateKeys: [["leads-kanban"], ["leads"]],
+    errorMessage: "Could not move lead. Reverted.",
+    onMutate: ({ leadId, status }) => {
+      const found = findLead(leadId);
+      if (found) {
+        moveKanbanCard(queryClient, ["leads-kanban"], leadId, found.status, status, STATUSES);
+      }
     },
   });
 

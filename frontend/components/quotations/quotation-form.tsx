@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
@@ -50,7 +52,7 @@ export function QuotationForm({
     enabled: !leadId,
   });
 
-  const mutation = useMutation({
+  const mutation = useOptimisticMutation({
     mutationFn: async () => {
       const items = lineItems
         .filter((i) => i.name.trim())
@@ -74,10 +76,24 @@ export function QuotationForm({
       const res = await api.post(endpoint, payload);
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["quotations"] });
-      if (leadId) queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
-      onSuccess?.(data);
+    snapshotKeys: [["quotations"], ["lead", leadId ?? ""]],
+    invalidateKeys: [["quotations"], ["lead", leadId ?? ""]],
+    onMutate: () => {
+      const tempId = createTempId();
+      const optimistic = { id: tempId, status, clientName: clientName.trim() };
+      appendToMatchingLists(queryClient, ["quotations"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["quotations"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

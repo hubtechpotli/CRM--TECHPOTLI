@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchListItem, removeListItem } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -71,7 +73,9 @@ export function CustomerDomainsPanel({ customerId }: { customerId: string }) {
     },
   });
 
-  const saveMutation = useMutation({
+  const domainsKey = ["customer-domains", customerId] as const;
+
+  const saveMutation = useOptimisticMutation({
     mutationFn: async () => {
       const body = toBody(form);
       if (editing) {
@@ -81,21 +85,29 @@ export function CustomerDomainsPanel({ customerId }: { customerId: string }) {
       const res = await api.post(`/customers/${customerId}/domains`, body);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-domains", customerId] });
-      queryClient.invalidateQueries({ queryKey: ["customer-timeline", customerId] });
+    snapshotKeys: [domainsKey],
+    invalidateKeys: [domainsKey, ["customer-timeline", customerId]],
+    onMutate: () => {
+      const body = toBody(form);
+      if (editing) {
+        patchListItem(queryClient, domainsKey, String(editing.id), body);
+      } else {
+        appendListItem(queryClient, domainsKey, { id: createTempId(), ...body });
+      }
       setShowModal(false);
       setEditing(null);
       setForm(emptyForm);
     },
   });
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: async (domainId: string) => {
       await api.delete(`/customers/${customerId}/domains/${domainId}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-domains", customerId] });
+    snapshotKeys: [domainsKey],
+    invalidateKeys: [domainsKey],
+    onMutate: (domainId) => {
+      removeListItem(queryClient, domainsKey, domainId);
     },
   });
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchDetailItem, removeListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -61,7 +63,10 @@ export default function SettingsPage() {
     setForce2FA(!!data.force2FA);
   }, [data]);
 
-  const saveMutation = useMutation({
+  const settingsKey = ["settings"] as const;
+  const ipsKey = ["settings-allowed-ips"] as const;
+
+  const saveMutation = useOptimisticMutation({
     mutationFn: async () => {
       const body: Record<string, unknown> = { force2FA };
       for (const field of SETTINGS_FIELDS) {
@@ -75,8 +80,15 @@ export default function SettingsPage() {
       const res = await api.patch("/settings", body);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    snapshotKeys: [settingsKey],
+    invalidateKeys: [settingsKey],
+    onMutate: () => {
+      const patch: Record<string, unknown> = { force2FA };
+      for (const field of SETTINGS_FIELDS) {
+        const val = form[field.key]?.trim();
+        patch[field.key] = field.type === "number" ? (val ? Number(val) : undefined) : val || undefined;
+      }
+      patchDetailItem(queryClient, settingsKey, patch);
       setSaveError(null);
     },
     onError: (err) => {
@@ -87,7 +99,7 @@ export default function SettingsPage() {
     },
   });
 
-  const addIpMutation = useMutation({
+  const addIpMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post("/settings/allowed-ips", {
         cidr: newIp.cidr.trim(),
@@ -95,8 +107,14 @@ export default function SettingsPage() {
       });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings-allowed-ips"] });
+    snapshotKeys: [ipsKey],
+    invalidateKeys: [ipsKey],
+    onMutate: () => {
+      appendListItem(queryClient, ipsKey, {
+        id: createTempId(),
+        cidr: newIp.cidr.trim(),
+        label: newIp.label.trim() || undefined,
+      });
       setNewIp({ cidr: "", label: "" });
       setIpError(null);
     },
@@ -108,12 +126,14 @@ export default function SettingsPage() {
     },
   });
 
-  const removeIpMutation = useMutation({
+  const removeIpMutation = useOptimisticMutation({
     mutationFn: async (id: string) => {
       await api.delete(`/settings/allowed-ips/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings-allowed-ips"] });
+    snapshotKeys: [ipsKey],
+    invalidateKeys: [ipsKey],
+    onMutate: (id) => {
+      removeListItem(queryClient, ipsKey, id);
       setIpError(null);
     },
     onError: (err) => {

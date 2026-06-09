@@ -1,7 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import {
+  appendToMatchingLists,
+  createTempId,
+  patchMatchingListItems,
+  replaceMatchingListItemId,
+} from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
@@ -73,7 +80,7 @@ export function EmployeeForm({
     setForm(toFormData(employee));
   }, [employee]);
 
-  const mutation = useMutation({
+  const mutation = useOptimisticMutation({
     mutationFn: async (payload: EmployeeFormData) => {
       if (isEdit) {
         const res = await api.patch(`/users/${employee!.id}`, {
@@ -98,9 +105,43 @@ export function EmployeeForm({
       });
       return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      onSuccess?.(data);
+    snapshotKeys: [["employees"]],
+    invalidateKeys: [["employees"]],
+    onMutate: (payload) => {
+      if (isEdit) {
+        const employeeId = String(employee!.id);
+        const patch = {
+          name: payload.name.trim(),
+          phone: payload.phone.trim() || undefined,
+          role: payload.role,
+          department: payload.department.trim() || undefined,
+          designation: payload.designation.trim() || undefined,
+          isActive: payload.isActive === "true",
+        };
+        patchMatchingListItems(queryClient, ["employees"], employeeId, patch);
+        onSuccess?.({ id: employeeId, ...patch });
+        return {};
+      }
+      const tempId = createTempId();
+      const optimistic = {
+        id: tempId,
+        name: payload.name.trim(),
+        email: payload.email.trim(),
+        role: payload.role,
+      };
+      appendToMatchingLists(queryClient, ["employees"], optimistic);
+      onSuccess?.(optimistic);
+      return { tempId };
+    },
+    onSuccess: (data, _vars, context) => {
+      if (context?.tempId && data && typeof data === "object" && "id" in data) {
+        replaceMatchingListItemId(
+          queryClient,
+          ["employees"],
+          context.tempId,
+          data as { id: string },
+        );
+      }
     },
     onError: (err) => {
       const message = isAxiosError(err)

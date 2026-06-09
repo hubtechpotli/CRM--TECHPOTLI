@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { removeListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel } from "@/lib/format";
@@ -27,13 +29,15 @@ export default function ApprovalsPage() {
     },
   });
 
-  const actionMutation = useMutation({
+  const actionMutation = useOptimisticMutation({
     mutationFn: async ({ id, action, rejectionReason }: { id: string; action: "approve" | "reject"; rejectionReason?: string }) => {
       const res = await api.patch(`/approvals/${id}/${action}`, action === "reject" ? { rejectionReason } : undefined);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["approvals-pending"] });
+    snapshotKeys: [["approvals-pending"]],
+    invalidateKeys: [["approvals-pending"]],
+    onMutate: ({ id }) => {
+      removeListItem(queryClient, ["approvals-pending"], id);
       setActionError(null);
     },
     onError: (err) => {

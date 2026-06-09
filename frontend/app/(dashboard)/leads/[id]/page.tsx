@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendDetailListItem, createTempId, patchDetailItem } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import {
@@ -113,7 +115,9 @@ export default function LeadDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
   };
 
-  const assignMutation = useMutation({
+  const leadKey = ["lead", id] as const;
+
+  const assignMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.patch(`/leads/${id}/assign`, {
         assignedToId: assignForm.assignedToId,
@@ -123,13 +127,19 @@ export default function LeadDetailPage() {
       });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [leadKey],
+    invalidateKeys: [leadKey, ["leads"], ["leads-kanban"]],
+    onMutate: () => {
+      patchDetailItem(queryClient, leadKey, {
+        assignedToId: assignForm.assignedToId,
+        followUpDate: assignForm.followUpDate || null,
+        priority: assignForm.priority,
+      });
       setShowAssign(false);
     },
   });
 
-  const activityMutation = useMutation({
+  const activityMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/leads/${id}/activities`, {
         type: activityForm.type,
@@ -140,28 +150,43 @@ export default function LeadDetailPage() {
       });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [leadKey],
+    invalidateKeys: [leadKey, ["leads"], ["leads-kanban"]],
+    onMutate: () => {
+      appendDetailListItem(queryClient, leadKey, "activities", {
+        id: createTempId(),
+        type: activityForm.type,
+        contactStatus: activityForm.contactStatus || null,
+        outcome: activityForm.outcome.trim() || null,
+        notes: activityForm.notes,
+        createdAt: new Date().toISOString(),
+      });
       setActivityForm({ type: "CALL", contactStatus: "", outcome: "", notes: "", nextFollowUp: "" });
       setShowActivity(false);
     },
   });
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async (status: string) => {
       const res = await api.patch(`/leads/${id}`, { status });
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [leadKey],
+    invalidateKeys: [leadKey, ["leads"], ["leads-kanban"]],
+    onMutate: (status) => {
+      patchDetailItem(queryClient, leadKey, { status });
+    },
   });
 
-  const lostMutation = useMutation({
+  const lostMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.patch(`/leads/${id}`, { status: "LOST", lostReason: lostReason.trim() });
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [leadKey],
+    invalidateKeys: [leadKey, ["leads"], ["leads-kanban"]],
+    onMutate: () => {
+      patchDetailItem(queryClient, leadKey, { status: "LOST", lostReason: lostReason.trim() });
       setShowLost(false);
       setLostReason("");
     },

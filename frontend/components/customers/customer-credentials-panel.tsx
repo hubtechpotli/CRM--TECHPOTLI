@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -33,13 +35,23 @@ export function CustomerCredentialsPanel({ customerId }: { customerId: string })
     },
   });
 
-  const createMutation = useMutation({
+  const credsKey = ["customer-credentials", customerId] as const;
+
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/customers/${customerId}/credentials`, form);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-credentials", customerId] });
+    snapshotKeys: [credsKey],
+    invalidateKeys: [credsKey],
+    onMutate: () => {
+      appendListItem(queryClient, credsKey, {
+        id: createTempId(),
+        vaultType: form.vaultType,
+        label: form.label,
+        username: form.username,
+        url: form.url,
+      });
       setShowAdd(false);
       setForm(emptyForm);
     },

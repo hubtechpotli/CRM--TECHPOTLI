@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { moveKanbanCard } from "@/lib/optimistic-mutation";
 import {
   DndContext,
   DragEndEvent,
@@ -126,14 +128,26 @@ export function ProjectKanban() {
     },
   });
 
-  const statusMutation = useMutation({
+  const statusMutation = useOptimisticMutation({
     mutationFn: async ({ projectId, status }: { projectId: string; status: string }) => {
       const res = await api.patch(`/projects/${projectId}/status`, { status });
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects-kanban"] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    snapshotKeys: [["projects-kanban"]],
+    invalidateKeys: [["projects-kanban"], ["projects"]],
+    errorMessage: "Could not move project. Reverted.",
+    onMutate: ({ projectId, status }) => {
+      const found = findProject(projectId);
+      if (found) {
+        moveKanbanCard(
+          queryClient,
+          ["projects-kanban"],
+          projectId,
+          found.status,
+          status,
+          PROJECT_STATUSES,
+        );
+      }
     },
   });
 

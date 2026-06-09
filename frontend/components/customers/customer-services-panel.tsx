@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { appendListItem, createTempId, patchListItem, removeListItem } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -69,49 +71,65 @@ export function CustomerServicesPanel({ customerId }: { customerId: string }) {
     },
   });
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["customer-services", customerId] });
-    queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
-    queryClient.invalidateQueries({ queryKey: ["customer-revenue", customerId] });
-  };
+  const servicesKey = ["customer-services", customerId] as const;
+  const serviceInvalidateKeys = [
+    servicesKey,
+    ["customer", customerId],
+    ["customer-revenue", customerId],
+  ] as const;
 
-  const createMutation = useMutation({
+  const createMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.post(`/customers/${customerId}/services`, buildBody(form));
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [servicesKey],
+    invalidateKeys: [...serviceInvalidateKeys],
+    onMutate: () => {
+      appendListItem(queryClient, servicesKey, {
+        id: createTempId(),
+        ...buildBody(form),
+      });
       setShowAdd(false);
       setForm(emptyForm);
     },
   });
 
-  const updateMutation = useMutation({
+  const updateMutation = useOptimisticMutation({
     mutationFn: async () => {
       const res = await api.patch(`/customers/${customerId}/services/${editing!.id}`, buildBody(form));
       return res.data;
     },
-    onSuccess: () => {
-      invalidate();
+    snapshotKeys: [servicesKey],
+    invalidateKeys: [...serviceInvalidateKeys],
+    onMutate: () => {
+      patchListItem(queryClient, servicesKey, String(editing!.id), buildBody(form));
       setEditing(null);
       setForm(emptyForm);
     },
   });
 
-  const toggleActiveMutation = useMutation({
+  const toggleActiveMutation = useOptimisticMutation({
     mutationFn: async ({ serviceId, isActive }: { serviceId: string; isActive: boolean }) => {
       const res = await api.patch(`/customers/${customerId}/services/${serviceId}`, { isActive });
       return res.data;
     },
-    onSuccess: invalidate,
+    snapshotKeys: [servicesKey],
+    invalidateKeys: [...serviceInvalidateKeys],
+    onMutate: ({ serviceId, isActive }) => {
+      patchListItem(queryClient, servicesKey, serviceId, { isActive });
+    },
   });
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: async (serviceId: string) => {
       await api.delete(`/customers/${customerId}/services/${serviceId}`);
     },
-    onSuccess: invalidate,
+    snapshotKeys: [servicesKey],
+    invalidateKeys: [...serviceInvalidateKeys],
+    onMutate: (serviceId) => {
+      removeListItem(queryClient, servicesKey, serviceId);
+    },
   });
 
   const isWebsite = form.serviceType === "WEBSITE_DEV";

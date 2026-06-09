@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { removeListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
@@ -35,13 +37,15 @@ export default function EmployeesPage() {
 
   const rows = Array.isArray(data) ? data : [];
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: async (id: string) => {
       await api.delete(`/users/${id}`);
     },
-    onSuccess: () => {
+    snapshotKeys: [["employees"]],
+    invalidateKeys: [["employees"]],
+    onMutate: (id) => {
+      removeListItem(queryClient, ["employees"], id);
       setDeleteError(null);
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
     onError: (err) => {
       const message = isAxiosError(err)

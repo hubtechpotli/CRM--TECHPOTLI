@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { patchDetailItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
@@ -49,16 +51,27 @@ export default function ProfilePage() {
 
   const displayName = name || profile?.name || "";
 
-  const saveMutation = useMutation({
+  const authMeKey = ["auth-me"] as const;
+
+  const saveMutation = useOptimisticMutation({
     mutationFn: async (nextName: string) => {
       const res = await api.patch<ProfileData>("/auth/me", { name: nextName.trim() });
       return res.data;
     },
-    onSuccess: (updated) => {
+    snapshotKeys: [authMeKey],
+    invalidateKeys: [authMeKey],
+    onMutate: (nextName) => {
+      const trimmed = nextName.trim();
       setSaveError(null);
       setSaveSuccess("Profile updated.");
+      setName(trimmed);
+      patchDetailItem(queryClient, authMeKey, { name: trimmed });
+      if (user && accessToken) {
+        setAuth({ ...user, name: trimmed }, accessToken, sessionId, 14 * 60_000);
+      }
+    },
+    onSuccess: (updated) => {
       setName(updated.name);
-      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
       if (user && accessToken) {
         setAuth(
           {

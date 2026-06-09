@@ -128,16 +128,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <RouteProgress />
       <aside
-        className="flex shrink-0 flex-col bg-sidebar text-sidebar-foreground"
+        className="sticky top-0 flex h-screen min-h-0 shrink-0 flex-col bg-sidebar text-sidebar-foreground"
         style={{ width: "var(--sidebar-width)" }}
       >
-        <div className="border-b border-white/10 px-5 py-5">
+        <div className="shrink-0 border-b border-white/10 px-5 py-5">
           <TechPotliLogo size="sm" className="items-start" />
           <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-indigo-200/50">
             CRM Console
           </p>
         </div>
-        <nav className="flex-1 space-y-5 overflow-y-auto p-3">
+        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
           {visibleGroups.map((group) => (
             <div key={group.label}>
               <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-indigo-200/40">
@@ -178,7 +178,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="border-t border-white/10 p-3">
+        <div className="shrink-0 border-t border-white/10 bg-sidebar p-3 shadow-[0_-4px_24px_rgba(0,0,0,0.25)]">
+          <Link
+            href="/profile"
+            className={cn(
+              "mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
+              pathname === "/profile"
+                ? "bg-primary text-primary-foreground shadow-md shadow-indigo-900/40"
+                : "text-indigo-100/80 hover:bg-white/10 hover:text-white",
+            )}
+          >
+            <User className="h-4 w-4 shrink-0" />
+            <span>Profile</span>
+          </Link>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
