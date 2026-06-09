@@ -75,6 +75,10 @@ export class IpWhitelistGuard implements CanActivate {
     if (isPublic || skipIp) return true;
 
     const request = context.switchToHttp().getRequest();
+    if (request.user?.allowRemoteAccess && request.user?.twoFactorEnabled) {
+      return true;
+    }
+
     const ip =
       (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       request.ip ||

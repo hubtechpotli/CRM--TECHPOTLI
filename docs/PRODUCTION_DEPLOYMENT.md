@@ -307,10 +307,16 @@ When the frontend and API are on **different domains**, the refresh cookie may n
 | Variable | Platform | Example |
 |----------|----------|---------|
 | `NEXT_PUBLIC_API_URL` | Vercel | `/api` |
-| `API_PROXY_TARGET` | Vercel | `https://your-api.up.railway.app` |
+| `API_PROXY_TARGET` | Vercel | `https://your-api.up.railway.app` (no `/api` suffix) |
+| `NEXT_PUBLIC_WS_URL` | Vercel | `https://your-api.up.railway.app` |
 | `FRONTEND_URL` | Railway | `https://your-app.vercel.app` (no trailing slash) |
 
-Redeploy Vercel after setting env vars. The browser then calls `/api/*` on the same domain as the app, and the refresh cookie persists for **7 days per browser**.
+Redeploy **both** Vercel and Railway after setting env vars. The browser calls `/api/*` on the Vercel domain; `app/api/[...path]/route.ts` proxies to Railway at runtime.
+
+**If pages show “Failed to load customers” (or other data):**
+1. Confirm `API_PROXY_TARGET` is set on Vercel → open `https://your-app.vercel.app/api/health` (should return `{"status":"ok"}`)
+2. Confirm your IP is in **Settings → Allowed IPs** or enable **Work from home** on your employee profile (2FA required)
+3. Redeploy Vercel after any env change
 
 **Optional backend cookie overrides** (Railway):
 

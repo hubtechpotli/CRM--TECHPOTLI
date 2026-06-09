@@ -30,6 +30,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         role: true,
         isActive: true,
         allowedIPs: true,
+        allowRemoteAccess: true,
+        twoFactorEnabled: true,
         mustChangePassword: true,
       },
     });
@@ -60,6 +62,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sid: payload.sid,
       mustChangePassword: user.mustChangePassword,
       allowedIPs: user.allowedIPs,
+      allowRemoteAccess: user.allowRemoteAccess,
+      twoFactorEnabled: user.twoFactorEnabled,
     };
   }
 }

@@ -8,6 +8,8 @@ export interface JwtPayload {
   sid: string;
   mustChangePassword?: boolean;
   allowedIPs?: string[];
+  allowRemoteAccess?: boolean;
+  twoFactorEnabled?: boolean;
 }
 
 export const CurrentUser = createParamDecorator(

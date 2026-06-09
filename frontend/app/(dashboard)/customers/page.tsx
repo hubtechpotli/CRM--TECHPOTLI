@@ -16,6 +16,7 @@ import { Modal } from "@/components/ui/modal";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
 import { isAdmin } from "@/lib/roles";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 
 const STATUS_TABS = [
@@ -145,6 +146,7 @@ export default function CustomersPage() {
         {error ? (
           <div className="py-12 text-center">
             <p className="text-sm text-red-500">Failed to load customers</p>
+            <p className="mt-1 text-xs text-muted-foreground">{getApiErrorMessage(error)}</p>
             <button type="button" onClick={() => refetch()} className="mt-3 text-sm text-primary hover:underline">
               Retry
             </button>
