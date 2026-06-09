@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { MailService } from '../mail/mail.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { CacheService } from '../redis/cache.service';
 
 @Injectable()
 export class ProjectsService {
@@ -16,7 +17,12 @@ export class ProjectsService {
     private gateway: NotificationsGateway,
     private mail: MailService,
     private activityLog: ActivityLogService,
+    private cache: CacheService,
   ) {}
+
+  private async invalidateKanbanCache() {
+    await this.cache.bumpNamespace('projects-kanban');
+  }
 
   findAll(filters?: { customerId?: string; status?: ProjectStatus }) {
     return this.prisma.project.findMany({
@@ -27,14 +33,18 @@ export class ProjectsService {
   }
 
   async kanban() {
-    const projects = await this.prisma.project.findMany({
-      include: { customer: { select: { id: true, companyName: true } }, workOrder: true },
-      orderBy: { updatedAt: 'desc' },
+    const ns = await this.cache.namespaceVersion('projects-kanban');
+    const cacheKey = `projects:kanban:${ns}`;
+    return this.cache.wrap(cacheKey, 30, async () => {
+      const projects = await this.prisma.project.findMany({
+        include: { customer: { select: { id: true, companyName: true } }, workOrder: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+      const columns: Record<ProjectStatus, typeof projects> = {} as Record<ProjectStatus, typeof projects>;
+      for (const status of Object.values(ProjectStatus)) columns[status] = [];
+      for (const project of projects) columns[project.status].push(project);
+      return columns;
     });
-    const columns: Record<ProjectStatus, typeof projects> = {} as Record<ProjectStatus, typeof projects>;
-    for (const status of Object.values(ProjectStatus)) columns[status] = [];
-    for (const project of projects) columns[project.status].push(project);
-    return columns;
   }
 
   findOne(id: string) {
@@ -68,6 +78,7 @@ export class ProjectsService {
         metadata: { projectId: project.id },
       },
     });
+    await this.invalidateKanbanCache();
     return full;
   }
 
@@ -96,12 +107,16 @@ export class ProjectsService {
     this.gateway.emitToRoom('super_admin', 'work_order:new', project);
   }
 
-  update(id: string, data: Prisma.ProjectUpdateInput) {
-    return this.prisma.project.update({ where: { id }, data });
+  async update(id: string, data: Prisma.ProjectUpdateInput) {
+    const project = await this.prisma.project.update({ where: { id }, data });
+    await this.invalidateKanbanCache();
+    return project;
   }
 
-  remove(id: string) {
-    return this.prisma.project.delete({ where: { id } });
+  async remove(id: string) {
+    const project = await this.prisma.project.delete({ where: { id } });
+    await this.invalidateKanbanCache();
+    return project;
   }
 
   async acceptWorkOrder(projectId: string, userId: string) {
@@ -172,6 +187,7 @@ export class ProjectsService {
         },
       });
     }
+    await this.invalidateKanbanCache();
     return history;
   }
 

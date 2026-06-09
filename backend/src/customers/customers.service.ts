@@ -23,6 +23,7 @@ import {
   getCustomerNoticeSubject,
 } from '../mail/templates/customer-notice.template';
 import { SendCustomerEmailDto } from './dto/send-customer-email.dto';
+import { CacheService } from '../redis/cache.service';
 
 @Injectable()
 export class CustomersService {
@@ -33,6 +34,7 @@ export class CustomersService {
     private mail: MailService,
     private notifications: NotificationsService,
     private gateway: NotificationsGateway,
+    private cache: CacheService,
   ) {}
 
   private workItemInclude = {
@@ -40,44 +42,72 @@ export class CustomersService {
     assignedTo: { select: { id: true, name: true } },
     project: { select: { id: true, name: true } },
     updates: {
-      orderBy: { createdAt: 'asc' as const },
+      take: 5,
+      orderBy: { createdAt: 'desc' as const },
       include: { author: { select: { id: true, name: true } } },
     },
   };
+
+  private async invalidateDirectoryCache() {
+    await this.cache.bumpNamespace('customers-directory');
+  }
 
   findAll() {
     return this.prisma.customer.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-  async directory(filters?: { status?: CustomerStatus; state?: string; q?: string; assignedEmployeeId?: string }) {
-    const where: Prisma.CustomerWhereInput = {};
-    if (filters?.status) where.status = filters.status;
-    if (filters?.state) where.state = filters.state;
-    if (filters?.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
-    if (filters?.q) {
-      where.OR = [
-        { companyName: { contains: filters.q, mode: 'insensitive' } },
-        { ownerName: { contains: filters.q, mode: 'insensitive' } },
-        { phone: { contains: filters.q } },
-        { email: { contains: filters.q, mode: 'insensitive' } },
-      ];
-    }
-    const rows = await this.prisma.customer.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      include: {
-        assignedEmployee: { select: { id: true, name: true } },
-        _count: {
-          select: {
-            workItems: { where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } },
+  async directory(
+    filters?: { status?: CustomerStatus; state?: string; q?: string; assignedEmployeeId?: string },
+    page = 1,
+    limit = 50,
+  ) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(500, Math.max(1, limit));
+    const ns = await this.cache.namespaceVersion('customers-directory');
+    const cacheKey = `customers:directory:${ns}:${JSON.stringify(filters ?? {})}:${safePage}:${safeLimit}`;
+
+    return this.cache.wrap(cacheKey, 60, async () => {
+      const where: Prisma.CustomerWhereInput = {};
+      if (filters?.status) where.status = filters.status;
+      if (filters?.state) where.state = filters.state;
+      if (filters?.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
+      if (filters?.q) {
+        where.OR = [
+          { companyName: { contains: filters.q, mode: 'insensitive' } },
+          { ownerName: { contains: filters.q, mode: 'insensitive' } },
+          { phone: { contains: filters.q } },
+          { email: { contains: filters.q, mode: 'insensitive' } },
+        ];
+      }
+
+      const [rows, total] = await Promise.all([
+        this.prisma.customer.findMany({
+          where,
+          orderBy: { createdAt: 'asc' },
+          skip: (safePage - 1) * safeLimit,
+          take: safeLimit,
+          include: {
+            assignedEmployee: { select: { id: true, name: true } },
+            _count: {
+              select: {
+                workItems: { where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } },
+              },
+            },
           },
-        },
-      },
+        }),
+        this.prisma.customer.count({ where }),
+      ]);
+
+      return {
+        items: rows.map(({ _count, ...row }) => ({
+          ...row,
+          openWorkItemCount: _count.workItems,
+        })),
+        total,
+        page: safePage,
+        limit: safeLimit,
+      };
     });
-    return rows.map(({ _count, ...row }) => ({
-      ...row,
-      openWorkItemCount: _count.workItems,
-    }));
   }
 
   findOne(id: string) {
@@ -97,15 +127,20 @@ export class CustomersService {
       description: customer.companyName,
       userId: createdById,
     });
+    await this.invalidateDirectoryCache();
     return customer;
   }
 
-  update(id: string, data: Prisma.CustomerUpdateInput) {
-    return this.prisma.customer.update({ where: { id }, data });
+  async update(id: string, data: Prisma.CustomerUpdateInput) {
+    const customer = await this.prisma.customer.update({ where: { id }, data });
+    await this.invalidateDirectoryCache();
+    return customer;
   }
 
-  remove(id: string) {
-    return this.prisma.customer.delete({ where: { id } });
+  async remove(id: string) {
+    const customer = await this.prisma.customer.delete({ where: { id } });
+    await this.invalidateDirectoryCache();
+    return customer;
   }
 
   async toggleFavorite(userId: string, customerId: string) {

@@ -42,12 +42,25 @@ export class RolesGuard implements CanActivate {
   }
 }
 
+let cachedOfficeCidrs: { cidrs: string[]; expiresAt: number } | null = null;
+
 @Injectable()
 export class IpWhitelistGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
   ) {}
+
+  private async getOfficeCidrs(): Promise<string[]> {
+    const now = Date.now();
+    if (cachedOfficeCidrs && cachedOfficeCidrs.expiresAt > now) {
+      return cachedOfficeCidrs.cidrs;
+    }
+    const allowed = await this.prisma.allowedOfficeIp.findMany({ where: { isActive: true } });
+    const cidrs = allowed.map((a) => a.cidr);
+    cachedOfficeCidrs = { cidrs, expiresAt: now + 5 * 60_000 };
+    return cidrs;
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -67,10 +80,10 @@ export class IpWhitelistGuard implements CanActivate {
       '127.0.0.1';
 
     const { ipMatchesCidr } = await import('../utils/ip.util');
-    const allowed = await this.prisma.allowedOfficeIp.findMany({ where: { isActive: true } });
+    const officeCidrs = await this.getOfficeCidrs();
     const userAllowed = request.user?.allowedIPs as string[] | undefined;
 
-    const cidrs = [...allowed.map((a) => a.cidr), ...(userAllowed || [])];
+    const cidrs = [...officeCidrs, ...(userAllowed || [])];
     if (cidrs.length === 0) return true;
 
     const ok = cidrs.some((c) => ipMatchesCidr(ip, c));

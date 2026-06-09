@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { refreshAccessToken } from "@/lib/api";
+import { AppShellSkeleton } from "@/components/ui/skeleton";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -53,20 +54,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [bootstrapping, accessToken, pending2FA, pending2FASetup, user, pathname, router]);
 
   if (bootstrapping) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading session…
-      </div>
-    );
+    return <AppShellSkeleton />;
   }
 
   const token = useAuthStore.getState().accessToken;
   if (!token || pending2FA || pending2FASetup) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Redirecting…
-      </div>
-    );
+    return <AppShellSkeleton />;
   }
 
   return <>{children}</>;

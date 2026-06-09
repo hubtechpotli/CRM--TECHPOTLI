@@ -43,10 +43,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const valid = await this.sessions.isSessionValid(payload.sid, payload.sub);
     if (!valid) throw new UnauthorizedException('Session expired');
 
-    await this.prisma.userSession.update({
-      where: { id: payload.sid },
-      data: { lastActiveAt: new Date() },
-    });
+    const activityKey = `session:active:${payload.sid}`;
+    const recentlyActive = await this.sessions.getRaw(activityKey);
+    if (!recentlyActive) {
+      await this.prisma.userSession.update({
+        where: { id: payload.sid },
+        data: { lastActiveAt: new Date() },
+      });
+      await this.sessions.setRaw(activityKey, '1', 300);
+    }
 
     return {
       sub: user.id,

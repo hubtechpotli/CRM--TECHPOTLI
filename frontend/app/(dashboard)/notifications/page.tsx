@@ -8,6 +8,7 @@ import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { ListPageSkeleton } from "@/components/ui/skeleton";
 
 type Notification = {
   id: string;
@@ -70,7 +71,7 @@ export default function NotificationsPage() {
 
       <GlassCard className="p-0 overflow-hidden">
         {isLoading ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Loading notifications…</p>
+          <ListPageSkeleton rows={6} columns={3} />
         ) : notifications.length === 0 ? (
           <div className="py-16 text-center">
             <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />

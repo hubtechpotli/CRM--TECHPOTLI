@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { SelectInput } from "@/components/ui/form-field";
 import { QUOTATION_STATUSES } from "@/lib/types";
 
@@ -51,7 +52,7 @@ export default function QuotationDetailPage() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading quotation…</p>;
+    return <CustomerDetailSkeleton />;
   }
   if (error || !data) {
     return <p className="text-sm text-red-500">Quotation not found</p>;

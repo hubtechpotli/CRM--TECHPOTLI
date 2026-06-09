@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { activityLink, formatLabel, timeAgo } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { FormField, SelectInput } from "@/components/ui/form-field";
 
 type ActivityItem = {
@@ -90,7 +91,7 @@ export default function ActivityPage() {
         </div>
 
         {isLoading ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Loading activity…</p>
+          <ListPageSkeleton rows={8} columns={4} />
         ) : items.length === 0 ? (
           <div className="py-16 text-center">
             <Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />

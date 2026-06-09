@@ -42,8 +42,10 @@ export function QuotationForm({
   const { data: customers = [] } = useQuery({
     queryKey: ["customers-directory"],
     queryFn: async () => {
-      const res = await api.get<Record<string, unknown>[]>("/customers/directory");
-      return res.data;
+      const data = await import("@/lib/customers-directory").then((m) =>
+        m.fetchCustomersDirectory({ limit: 500 }),
+      );
+      return data.items;
     },
     enabled: !leadId,
   });

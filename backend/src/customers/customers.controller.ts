@@ -28,8 +28,14 @@ export class CustomersController {
     @Query('state') state?: string,
     @Query('q') q?: string,
     @Query('assignedEmployeeId') assignedEmployeeId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.customers.directory({ status, state, q, assignedEmployeeId });
+    return this.customers.directory(
+      { status, state, q, assignedEmployeeId },
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+    );
   }
 
   @Get('favorites')

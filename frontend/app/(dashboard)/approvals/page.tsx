@@ -9,6 +9,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable } from "@/components/dashboard/data-table";
 import { ListActionButton } from "@/components/dashboard/list-actions";
+import { ListPageSkeleton } from "@/components/ui/skeleton";
 
 type ApprovalRow = Record<string, unknown> & {
   requestedBy?: { name?: string };
@@ -59,7 +60,7 @@ export default function ApprovalsPage() {
       ) : null}
       <GlassCard>
         {isLoading ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+          <ListPageSkeleton rows={5} columns={4} />
         ) : error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-500">Failed to load approvals</p>

@@ -13,6 +13,14 @@ export class SessionService {
     await this.redis.set(`${SESSION_PREFIX}user:${userId}:${sessionId}`, '1', SESSION_TTL);
   }
 
+  async getRaw(key: string): Promise<string | null> {
+    return this.redis.get(key);
+  }
+
+  async setRaw(key: string, value: string, ttlSeconds: number): Promise<void> {
+    await this.redis.set(key, value, ttlSeconds);
+  }
+
   async isSessionValid(sessionId: string, userId: string): Promise<boolean> {
     if (!(await this.redis.ping())) {
       return true;

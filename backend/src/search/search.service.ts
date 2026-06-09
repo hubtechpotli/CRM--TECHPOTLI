@@ -21,10 +21,8 @@ export class SearchService {
 
     const cacheKey = `search:${term.toLowerCase()}:${userRole ?? 'anon'}:${userId ?? ''}`;
     return this.cache.wrap(cacheKey, 60, async () => {
-      const [keyword, semantic] = await Promise.all([
-        this.keywordSearch(term, userRole, userId),
-        this.semanticSearch(term, userRole, userId),
-      ]);
+      const keyword = await this.keywordSearch(term, userRole, userId);
+      const semantic = term.length >= 3 ? await this.semanticSearch(term, userRole, userId) : [];
       return { ...keyword, semantic };
     });
   }
@@ -136,21 +134,36 @@ export class SearchService {
         WHERE vector IS NOT NULL
         ORDER BY vector <=> ${vectorStr}::vector
         LIMIT 8`;
+      const leadIds = rows.filter((r) => r.entityType === 'lead').map((r) => r.entityId);
+      const customerIds = rows.filter((r) => r.entityType === 'customer').map((r) => r.entityId);
+
+      const [leads, customers] = await Promise.all([
+        leadIds.length
+          ? this.prisma.lead.findMany({
+              where: { id: { in: leadIds } },
+              select: { id: true, companyName: true, assignedToId: true },
+            })
+          : Promise.resolve([]),
+        customerIds.length
+          ? this.prisma.customer.findMany({
+              where: { id: { in: customerIds } },
+              select: { id: true, companyName: true },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const leadMap = new Map(leads.map((l) => [l.id, l]));
+      const customerMap = new Map(customers.map((c) => [c.id, c]));
+
       const results: { type: string; id: string; label: string; score: number }[] = [];
       for (const row of rows) {
         if (row.entityType === 'lead') {
-          const lead = await this.prisma.lead.findUnique({
-            where: { id: row.entityId },
-            select: { companyName: true, assignedToId: true },
-          });
+          const lead = leadMap.get(row.entityId);
           if (!lead) continue;
           if (userRole === UserRole.EMPLOYEE && userId && lead.assignedToId !== userId) continue;
           results.push({ type: 'lead', id: row.entityId, label: lead.companyName, score: Number(row.score) });
         } else if (row.entityType === 'customer') {
-          const customer = await this.prisma.customer.findUnique({
-            where: { id: row.entityId },
-            select: { companyName: true },
-          });
+          const customer = customerMap.get(row.entityId);
           if (customer) results.push({ type: 'customer', id: row.entityId, label: customer.companyName, score: Number(row.score) });
         }
       }

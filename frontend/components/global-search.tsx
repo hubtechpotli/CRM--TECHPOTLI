@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { api } from "@/lib/api";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 type SearchResults = {
   customers: { id: string; companyName: string; ownerName?: string }[];
@@ -19,8 +20,10 @@ export function GlobalSearch() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 300);
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -37,20 +40,45 @@ export function GlobalSearch() {
     if (!open) {
       setQuery("");
       setResults(null);
+      abortRef.current?.abort();
     }
   }, [open]);
 
-  const runSearch = useCallback(async (q: string) => {
-    setQuery(q);
-    if (!q.trim()) {
+  useEffect(() => {
+    if (!open) return;
+
+    const q = debouncedQuery.trim();
+    if (!q) {
       setResults(null);
+      setLoading(false);
+      abortRef.current?.abort();
       return;
     }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
-    try {
-      const res = await api.get<SearchResults>("/search", { params: { q } });
-      setResults(res.data);
-    } finally {
+
+    api
+      .get<SearchResults>("/search", { params: { q }, signal: controller.signal })
+      .then((res) => {
+        if (!controller.signal.aborted) setResults(res.data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResults(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [debouncedQuery, open]);
+
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
+    if (!value.trim()) {
+      setResults(null);
       setLoading(false);
     }
   }, []);
@@ -82,7 +110,7 @@ export function GlobalSearch() {
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Command.Input
               value={query}
-              onValueChange={runSearch}
+              onValueChange={handleQueryChange}
               placeholder="Search customers, leads, projects…"
               className="h-12 w-full bg-transparent text-sm outline-none"
               autoFocus

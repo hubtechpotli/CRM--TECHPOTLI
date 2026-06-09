@@ -40,4 +40,19 @@ export class CacheService {
     await this.set(key, result, ttlSeconds);
     return result;
   }
+
+  async namespaceVersion(namespace: string): Promise<string> {
+    const v = await this.redis.get(`cache:ns:${namespace}`);
+    return v ?? '0';
+  }
+
+  async bumpNamespace(namespace: string): Promise<void> {
+    try {
+      const current = await this.redis.get(`cache:ns:${namespace}`);
+      const next = String((current ? parseInt(current, 10) : 0) + 1);
+      await this.redis.set(`cache:ns:${namespace}`, next);
+    } catch {
+      /* noop */
+    }
+  }
 }

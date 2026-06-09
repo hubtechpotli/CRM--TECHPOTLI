@@ -9,6 +9,7 @@ import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/dashboard/data-table";
 import { ListActionButton } from "@/components/dashboard/list-actions";
 import { Modal } from "@/components/ui/modal";
@@ -76,7 +77,7 @@ export default function EmployeesPage() {
       ) : null}
       <GlassCard>
         {isLoading ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+          <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-500">Failed to load employees</p>

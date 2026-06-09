@@ -8,6 +8,7 @@ import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
 import { PROJECT_STATUSES } from "@/lib/types";
 
@@ -96,7 +97,7 @@ export default function ProjectDetailPage() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading project…</p>;
+    return <CustomerDetailSkeleton />;
   }
   if (error || !data) {
     return <p className="text-sm text-red-500">Project not found</p>;

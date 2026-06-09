@@ -52,7 +52,7 @@ export default function InvoiceDetailPage() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading invoice…</p>;
+    return <div className="space-y-6"><div className="h-8 w-48 animate-pulse rounded bg-muted" /><div className="h-64 animate-pulse rounded-2xl border border-border/60 bg-card" /></div>;
   }
   if (error || !data) {
     return <p className="text-sm text-red-500">Invoice not found</p>;

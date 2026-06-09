@@ -47,6 +47,7 @@ import {
   QuickFacts,
   StatusHistoryTimeline,
 } from "@/components/leads/lead-detail-parts";
+import { LeadDetailSkeleton } from "@/components/ui/skeleton";
 
 type LeadDetail = Record<string, unknown> & {
   activities?: Array<Record<string, unknown> & { user?: { name?: string } }>;
@@ -59,27 +60,6 @@ type LeadDetail = Record<string, unknown> & {
   aiScore?: number | null;
   aiScoreReason?: string | null;
 };
-
-function DetailSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-      <GlassCard className="space-y-4">
-        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-        <div className="grid gap-2 sm:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
-          ))}
-        </div>
-      </GlassCard>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <GlassCard className="h-64 animate-pulse"><span className="sr-only">Loading</span></GlassCard>
-        <GlassCard className="h-64 animate-pulse"><span className="sr-only">Loading</span></GlassCard>
-      </div>
-    </div>
-  );
-}
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -210,7 +190,7 @@ export default function LeadDetailPage() {
     },
   });
 
-  if (isLoading) return <DetailSkeleton />;
+  if (isLoading) return <LeadDetailSkeleton />;
 
   if (error || !data) {
     const forbidden = isAxiosError(error) && error.response?.status === 403;

@@ -17,7 +17,18 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { LeadKanban } from "@/components/leads/lead-kanban";
+import dynamic from "next/dynamic";
+
+const LeadKanban = dynamic(() => import("@/components/leads/lead-kanban").then((m) => m.LeadKanban), {
+  ssr: false,
+  loading: () => (
+    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-96 animate-pulse rounded-2xl border border-border/60 bg-muted/30" />
+      ))}
+    </div>
+  ),
+});
 import { LeadForm } from "@/components/leads/lead-form";
 import {
   CompanyAvatar,
@@ -75,6 +86,7 @@ export default function LeadsPage() {
 
   const { data: kanbanData } = useQuery({
     queryKey: ["leads-kanban"],
+    enabled: view === "kanban",
     queryFn: async () => {
       const res = await api.get<Record<string, LeadRow[]>>("/leads/kanban");
       return res.data;

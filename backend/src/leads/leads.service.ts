@@ -15,6 +15,7 @@ import {
   buildLeadWhere,
   isLeadAdmin,
 } from './lead-access';
+import { CacheService } from '../redis/cache.service';
 
 const leadListInclude = {
   assignedTo: { select: { id: true, name: true } },
@@ -32,7 +33,12 @@ export class LeadsService {
     private quotations: QuotationsService,
     private events: EventPublisherService,
     private asyncProcessing: AsyncProcessingService,
+    private cache: CacheService,
   ) {}
+
+  private async invalidateKanbanCache() {
+    await this.cache.bumpNamespace('leads-kanban');
+  }
 
   async findAll(
     filters: { status?: LeadStatus; assignedToId?: string; page?: number; limit?: number },
@@ -71,16 +77,20 @@ export class LeadsService {
   }
 
   async kanban(userRole: string, userId: string) {
-    const where = buildLeadWhere(userRole, userId);
-    const leads = await this.prisma.lead.findMany({
-      where,
-      include: { assignedTo: { select: { id: true, name: true } } },
-      orderBy: { updatedAt: 'desc' },
+    const ns = await this.cache.namespaceVersion('leads-kanban');
+    const cacheKey = `leads:kanban:${ns}:${userRole}:${userId}`;
+    return this.cache.wrap(cacheKey, 30, async () => {
+      const where = buildLeadWhere(userRole, userId);
+      const leads = await this.prisma.lead.findMany({
+        where,
+        include: { assignedTo: { select: { id: true, name: true } } },
+        orderBy: { updatedAt: 'desc' },
+      });
+      const columns: Record<LeadStatus, typeof leads> = {} as Record<LeadStatus, typeof leads>;
+      for (const status of Object.values(LeadStatus)) columns[status] = [];
+      for (const lead of leads) columns[lead.status].push(lead);
+      return columns;
     });
-    const columns: Record<LeadStatus, typeof leads> = {} as Record<LeadStatus, typeof leads>;
-    for (const status of Object.values(LeadStatus)) columns[status] = [];
-    for (const lead of leads) columns[lead.status].push(lead);
-    return columns;
   }
 
   async teamSummary() {
@@ -188,6 +198,7 @@ export class LeadsService {
     await this.events.leadCreated(lead as unknown as Record<string, unknown>, createdById);
     await this.events.entityUpdated('lead', lead.id, lead as unknown as Record<string, unknown>);
     this.asyncProcessing.onLeadCreated(lead);
+    await this.invalidateKanbanCache();
     return lead;
   }
 
@@ -219,14 +230,18 @@ export class LeadsService {
         newValue: { status: data.status },
       });
     }
-    return this.prisma.lead.update({ where: { id }, data });
+    const updated = await this.prisma.lead.update({ where: { id }, data });
+    await this.invalidateKanbanCache();
+    return updated;
   }
 
   async remove(id: string, userRole: string, userId: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead not found');
     assertCanDelete(userRole);
-    return this.prisma.lead.delete({ where: { id } });
+    const deleted = await this.prisma.lead.delete({ where: { id } });
+    await this.invalidateKanbanCache();
+    return deleted;
   }
 
   async assign(
@@ -267,6 +282,7 @@ export class LeadsService {
     });
     await this.mail.sendToUser(assignedToId, 'New Lead Assigned', `<p>${msg}</p>`);
     await this.activityLog.log({ userId: adminId, action: 'LEAD_ASSIGNED', module: 'lead', recordId: id, newValue: { assignedToId } });
+    await this.invalidateKanbanCache();
 
     return updated;
   }
@@ -298,6 +314,7 @@ export class LeadsService {
     }
     if (Object.keys(leadUpdate).length) {
       await this.prisma.lead.update({ where: { id: leadId }, data: leadUpdate });
+      await this.invalidateKanbanCache();
     }
     await this.events.leadActivityLogged(leadId, activity as unknown as Record<string, unknown>, userId);
     this.asyncProcessing.onLeadActivity(leadId);
@@ -334,6 +351,7 @@ export class LeadsService {
     await this.events.leadConverted(leadId, customer.id, userId);
     await this.events.entityUpdated('customer', customer.id, customer as unknown as Record<string, unknown>);
     this.asyncProcessing.onLeadConverted(customer);
+    await this.invalidateKanbanCache();
     return customer;
   }
 }

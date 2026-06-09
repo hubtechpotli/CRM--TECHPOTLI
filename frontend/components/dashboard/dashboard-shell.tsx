@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Calendar,
@@ -32,14 +33,70 @@ function getPageCta(pathname: string) {
   return match ? PAGE_CTAS[match] : PAGE_CTAS["/dashboard"];
 }
 
+const PREFETCH_ROUTES = ["/dashboard", "/customers", "/leads", "/projects", "/reports"];
+
+function RouteProgress() {
+  const pathname = usePathname();
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    setProgress(30);
+    const t1 = setTimeout(() => setProgress(70), 100);
+    const t2 = setTimeout(() => setProgress(100), 250);
+    const t3 = setTimeout(() => setProgress(0), 450);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [pathname]);
+
+  if (progress === 0) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 bg-primary/15">
+      <div
+        className="h-full bg-primary transition-all duration-200 ease-out"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+}
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
   const isDashboard = pathname === "/dashboard";
   const cta = getPageCta(pathname);
+
+  function prefetchRoute(href: string) {
+    if (!PREFETCH_ROUTES.includes(href)) return;
+    router.prefetch(href);
+    if (href === "/dashboard") {
+      queryClient.prefetchQuery({
+        queryKey: ["crm-insights"],
+        queryFn: async () => (await api.get("/reports/crm-insights")).data,
+        staleTime: 60_000,
+      });
+    }
+    if (href === "/customers") {
+      queryClient.prefetchQuery({
+        queryKey: ["customers-directory", { page: 1, limit: 50 }],
+        queryFn: async () => (await import("@/lib/customers-directory")).fetchCustomersDirectory({ page: 1, limit: 50 }),
+        staleTime: 60_000,
+      });
+    }
+    if (href === "/leads") {
+      queryClient.prefetchQuery({
+        queryKey: ["leads", "", "", 1],
+        queryFn: async () => (await api.get("/leads", { params: { page: 1, limit: 50 } })).data,
+        staleTime: 60_000,
+      });
+    }
+  }
 
   const { data: teamSummary } = useQuery({
     queryKey: ["team-updates-summary"],
@@ -66,6 +123,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <RouteProgress />
       <aside
         className="flex shrink-0 flex-col bg-sidebar text-sidebar-foreground"
         style={{ width: "var(--sidebar-width)" }}
@@ -93,6 +151,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     <Link
                       key={href}
                       href={href}
+                      onMouseEnter={() => prefetchRoute(href)}
                       className={cn(
                         "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
                         active

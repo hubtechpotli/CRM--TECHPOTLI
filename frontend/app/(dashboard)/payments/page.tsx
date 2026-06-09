@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable } from "@/components/dashboard/data-table";
 import { Modal } from "@/components/ui/modal";
 import { PaymentForm } from "@/components/payments/payment-form";
+import { ListPageSkeleton } from "@/components/ui/skeleton";
 
 type PaymentRow = Record<string, unknown>;
 
@@ -42,7 +43,7 @@ export default function PaymentsPage() {
       />
       <GlassCard>
         {isLoading ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+          <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-500">Failed to load payments</p>

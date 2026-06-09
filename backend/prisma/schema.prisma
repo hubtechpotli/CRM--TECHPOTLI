@@ -540,6 +540,7 @@ model Lead {
   @@index([followUpDate])
   @@index([priority])
   @@index([createdAt(sort: Desc)])
+  @@index([updatedAt])
   @@index([companyName])
 }
 
@@ -1113,6 +1114,7 @@ model Payment {
   @@index([invoiceId])
   @@index([status])
   @@index([dueDate])
+  @@index([status, paidDate])
 }
 
 model Renewal {

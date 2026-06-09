@@ -10,6 +10,7 @@ import { formatDateTime, formatLabel } from "@/lib/format";
 import { TICKET_STATUSES } from "@/lib/types";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { FormField, SelectInput, TextArea } from "@/components/ui/form-field";
 
 type TicketDetail = Record<string, unknown> & {
@@ -74,7 +75,7 @@ export default function SupportTicketDetailPage() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading ticket…</p>;
+    return <CustomerDetailSkeleton />;
   }
   if (loadError || !data) {
     return <p className="text-sm text-red-500">Ticket not found</p>;

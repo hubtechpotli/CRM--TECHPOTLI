@@ -6,6 +6,7 @@ import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { FormField, TextInput } from "@/components/ui/form-field";
 import { ListActionButton } from "@/components/dashboard/list-actions";
 import { SecurityPanel } from "@/components/settings/security-panel";
@@ -134,7 +135,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="System configuration — super admin only." />
       <GlassCard>
         {isLoading ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Loading settings…</p>
+          <CardSkeleton className="h-48" />
         ) : error ? (
           <div className="py-8 text-center">
             <p className="text-sm text-red-500">Unable to load settings. Super admin access required.</p>
@@ -201,7 +202,7 @@ export default function SettingsPage() {
           </button>
         </form>
         {ipsLoading ? (
-          <p className="text-sm text-muted-foreground">Loading IPs…</p>
+          <CardSkeleton className="h-24" />
         ) : (
           <ul className="divide-y divide-border/50 text-sm">
             {allowedIps.map((ip) => (

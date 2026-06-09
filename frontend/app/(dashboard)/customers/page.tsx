@@ -2,9 +2,10 @@
 
 import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { fetchCustomersDirectory } from "@/lib/customers-directory";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Filter, Plus, Search, Users, X } from "lucide-react";
-import { api } from "@/lib/api";
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { StatusTabs } from "@/components/dashboard/status-tabs";
@@ -35,15 +36,23 @@ export default function CustomersPage() {
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search);
 
   const params = useMemo(
     () => ({
-      q: search.trim() || undefined,
+      q: debouncedSearch.trim() || undefined,
       status: statusFilter || undefined,
       assignedEmployeeId: assigneeFilter || undefined,
+      page,
+      limit: 50,
     }),
-    [search, statusFilter, assigneeFilter],
+    [debouncedSearch, statusFilter, assigneeFilter, page],
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, assigneeFilter]);
 
   useEffect(() => {
     if (searchParams.get("new") === "1") setShowNewCustomer(true);
@@ -51,13 +60,12 @@ export default function CustomersPage() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["customers-directory", params],
-    queryFn: async () => {
-      const res = await api.get<CustomerRow[]>("/customers/directory", { params });
-      return res.data;
-    },
+    queryFn: () => fetchCustomersDirectory<CustomerRow>(params),
   });
 
-  const rows = Array.isArray(data) ? data : [];
+  const rows = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / 50));
   const hasFilters = Boolean(statusFilter || assigneeFilter || search.trim());
 
   return (
@@ -92,8 +100,10 @@ export default function CustomersPage() {
       <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
         <Users className="h-5 w-5 text-primary" />
         <div>
-          <p className="text-sm font-semibold">{rows.length} customers</p>
-          <p className="text-xs text-muted-foreground">Sorted oldest to newest</p>
+          <p className="text-sm font-semibold">{total} customers</p>
+          <p className="text-xs text-muted-foreground">
+            Page {page} of {totalPages} · sorted oldest to newest
+          </p>
         </div>
       </div>
 
@@ -147,6 +157,29 @@ export default function CustomersPage() {
               showAssignee={adminView}
               emptyMessage="No customers match your search. Add a new customer to get started."
             />
+            {totalPages > 1 ? (
+              <div className="flex items-center justify-between border-t border-border/50 px-4 py-3">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </SectionCard>

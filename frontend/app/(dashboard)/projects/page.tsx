@@ -12,7 +12,18 @@ import { StatusTabs } from "@/components/dashboard/status-tabs";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { PremiumDataTable } from "@/components/dashboard/premium-data-table";
 import { ProjectForm } from "@/components/projects/project-form";
-import { ProjectKanban } from "@/components/projects/project-kanban";
+import dynamic from "next/dynamic";
+
+const ProjectKanban = dynamic(() => import("@/components/projects/project-kanban").then((m) => m.ProjectKanban), {
+  ssr: false,
+  loading: () => (
+    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-96 animate-pulse rounded-2xl border border-border/60 bg-muted/30" />
+      ))}
+    </div>
+  ),
+});
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
@@ -95,9 +106,7 @@ export default function ProjectsPage() {
         }
       />
 
-      {view === "kanban" ? (
-        <ProjectKanban />
-      ) : (
+      {view === "kanban" ? <ProjectKanban /> : (
         <SectionCard noPadding>
           <div className="border-b border-border/50 p-5">
             <StatusTabs tabs={STATUS_TABS} value={statusFilter} onChange={setStatusFilter} />

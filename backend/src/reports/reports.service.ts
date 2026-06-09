@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LeadStatus } from '@prisma/client';
+import { LeadStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaReadService } from '../prisma/prisma-read.service';
 import { CacheService } from '../redis/cache.service';
@@ -205,10 +205,13 @@ export class ReportsService {
             activities: { take: 1, orderBy: { createdAt: 'desc' } },
           },
         }),
-        this.prismaRead.lead.findMany({
-          where: { ...leadWhere, createdAt: { gte: currentStart } },
-          select: { createdAt: true },
-        }),
+        this.prismaRead.$queryRaw<{ day: Date; count: bigint }[]>`
+          SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
+          FROM "Lead"
+          WHERE "createdAt" >= ${currentStart}
+          ${userRole === UserRole.EMPLOYEE && userId ? Prisma.sql`AND "assignedToId" = ${userId}` : Prisma.empty}
+          GROUP BY 1
+          ORDER BY 1`,
       ]);
 
       const revenue = Number(revenueAgg._sum.paidAmount ?? 0);
@@ -219,9 +222,9 @@ export class ReportsService {
         d.setDate(d.getDate() - i);
         dayMap.set(d.toISOString().slice(0, 10), 0);
       }
-      for (const lead of trendLeads) {
-        const key = new Date(lead.createdAt).toISOString().slice(0, 10);
-        if (dayMap.has(key)) dayMap.set(key, (dayMap.get(key) ?? 0) + 1);
+      for (const row of trendLeads) {
+        const key = new Date(row.day).toISOString().slice(0, 10);
+        if (dayMap.has(key)) dayMap.set(key, Number(row.count));
       }
       const leadsTrend = Array.from(dayMap.entries()).map(([date, count]) => ({ date, count }));
 

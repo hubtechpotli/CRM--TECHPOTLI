@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,21 +10,66 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { CustomerProfileSections } from "@/components/customers/customer-profile-sections";
-import { CustomerServicesPanel } from "@/components/customers/customer-services-panel";
-import { CustomerRevenuePanel } from "@/components/customers/customer-revenue-panel";
-import { CustomerPaymentsPanel } from "@/components/customers/customer-payments-panel";
-import { CustomerCredentialsPanel } from "@/components/customers/customer-credentials-panel";
-import { CustomerPortalWidget } from "@/components/customers/customer-portal-widget";
-import { CustomerDomainsPanel } from "@/components/customers/customer-domains-panel";
-import { CustomerHostingPanel } from "@/components/customers/customer-hosting-panel";
-import { CustomerDocumentsPanel } from "@/components/customers/customer-documents-panel";
-import { CustomerTimelinePanel } from "@/components/customers/customer-timeline-panel";
-import { CustomerCallLogsPanel } from "@/components/customers/customer-call-logs-panel";
-import { CustomerWorkHub, CustomerRecentUpdates } from "@/components/customers/customer-work-hub";
-import { CustomerQuickNotes } from "@/components/customers/customer-notes-panel";
-import { CustomerEmailPanel } from "@/components/customers/customer-email-panel";
 import { ProjectForm } from "@/components/projects/project-form";
 import { Modal } from "@/components/ui/modal";
+import { CardSkeleton, CustomerDetailSkeleton } from "@/components/ui/skeleton";
+
+const CustomerServicesPanel = dynamic(
+  () => import("@/components/customers/customer-services-panel").then((m) => m.CustomerServicesPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerRevenuePanel = dynamic(
+  () => import("@/components/customers/customer-revenue-panel").then((m) => m.CustomerRevenuePanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerPaymentsPanel = dynamic(
+  () => import("@/components/customers/customer-payments-panel").then((m) => m.CustomerPaymentsPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerCredentialsPanel = dynamic(
+  () => import("@/components/customers/customer-credentials-panel").then((m) => m.CustomerCredentialsPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerPortalWidget = dynamic(
+  () => import("@/components/customers/customer-portal-widget").then((m) => m.CustomerPortalWidget),
+  { loading: () => <CardSkeleton className="h-36" /> },
+);
+const CustomerDomainsPanel = dynamic(
+  () => import("@/components/customers/customer-domains-panel").then((m) => m.CustomerDomainsPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerHostingPanel = dynamic(
+  () => import("@/components/customers/customer-hosting-panel").then((m) => m.CustomerHostingPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerDocumentsPanel = dynamic(
+  () => import("@/components/customers/customer-documents-panel").then((m) => m.CustomerDocumentsPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerTimelinePanel = dynamic(
+  () => import("@/components/customers/customer-timeline-panel").then((m) => m.CustomerTimelinePanel),
+  { loading: () => <CardSkeleton className="h-64" /> },
+);
+const CustomerCallLogsPanel = dynamic(
+  () => import("@/components/customers/customer-call-logs-panel").then((m) => m.CustomerCallLogsPanel),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerWorkHub = dynamic(
+  () => import("@/components/customers/customer-work-hub").then((m) => m.CustomerWorkHub),
+  { loading: () => <CardSkeleton className="h-64" /> },
+);
+const CustomerRecentUpdates = dynamic(
+  () => import("@/components/customers/customer-work-hub").then((m) => m.CustomerRecentUpdates),
+  { loading: () => <CardSkeleton className="h-36" /> },
+);
+const CustomerQuickNotes = dynamic(
+  () => import("@/components/customers/customer-notes-panel").then((m) => m.CustomerQuickNotes),
+  { loading: () => <CardSkeleton className="h-48" /> },
+);
+const CustomerEmailPanel = dynamic(
+  () => import("@/components/customers/customer-email-panel").then((m) => m.CustomerEmailPanel),
+  { loading: () => <CardSkeleton className="h-36" /> },
+);
 
 type Tab =
   | "overview"
@@ -85,6 +131,7 @@ export default function CustomerDetailPage() {
       const res = await api.get<{ customer: { id: string } }[]>("/customers/favorites");
       return res.data;
     },
+    enabled: !isLoading,
   });
 
   useEffect(() => {
@@ -123,7 +170,7 @@ export default function CustomerDetailPage() {
   }, [searchParams, id, router]);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading customer…</p>;
+    return <CustomerDetailSkeleton />;
   }
   if (error || !data) {
     return <p className="text-sm text-red-500">Customer not found</p>;

@@ -110,8 +110,10 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers-directory-quick"],
     queryFn: async () => {
-      const res = await api.get<Array<{ id: string; companyName?: string }>>("/customers/directory");
-      return Array.isArray(res.data) ? res.data : [];
+      const data = await import("@/lib/customers-directory").then((m) =>
+        m.fetchCustomersDirectory<{ id: string; companyName?: string }>({ limit: 500 }),
+      );
+      return data.items;
     },
     enabled: showForm && !compact,
   });

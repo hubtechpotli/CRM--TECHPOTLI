@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CardSkeleton } from "@/components/ui/skeleton";
 
 type RenewalDetail = Record<string, unknown> & {
   customer?: { companyName?: string; phone?: string; email?: string };
@@ -25,7 +26,7 @@ export default function RenewalDetailPage() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading renewal…</p>;
+    return <CardSkeleton className="h-48" />;
   }
   if (error || !data) {
     return <p className="text-sm text-red-500">Renewal not found</p>;
