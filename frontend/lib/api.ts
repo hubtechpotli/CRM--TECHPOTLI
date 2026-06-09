@@ -2,13 +2,15 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
 
 function resolveApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!envUrl) {
+    if (typeof window !== "undefined") return "/api";
+    return "http://localhost:3001/api";
   }
-  if (typeof window !== "undefined") {
-    return "/api";
-  }
-  return "http://localhost:3001/api";
+  const trimmed = envUrl.replace(/\/$/, "");
+  if (trimmed === "/api" || trimmed.endsWith("/api")) return trimmed;
+  if (/^https?:\/\//.test(trimmed)) return `${trimmed}/api`;
+  return trimmed;
 }
 
 const baseURL = resolveApiBaseUrl();

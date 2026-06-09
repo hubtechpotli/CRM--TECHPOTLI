@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 function getApiOrigin(): string {
-  return (process.env.API_PROXY_TARGET || "").replace(/\/$/, "");
+  return (process.env.API_PROXY_TARGET || "").replace(/\/$/, "").replace(/\/api$/, "");
 }
 
 const HOP_BY_HOP = new Set(["connection", "keep-alive", "transfer-encoding", "te", "upgrade"]);

@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    const apiOrigin = process.env.API_PROXY_TARGET?.replace(/\/$/, "");
+    const apiOrigin = process.env.API_PROXY_TARGET?.replace(/\/$/, "").replace(/\/api$/, "");
     if (!apiOrigin) return [];
     return [{ source: "/api/:path*", destination: `${apiOrigin}/api/:path*` }];
   },
