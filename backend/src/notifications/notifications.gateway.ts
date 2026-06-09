@@ -6,10 +6,13 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { isAllowedCorsOrigin } from '../common/utils/cors-origins.util';
 
 @WebSocketGateway({
   cors: {
-    origin: (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, ''),
+    origin: (origin, callback) => {
+      callback(null, isAllowedCorsOrigin(origin));
+    },
     credentials: true,
   },
 })

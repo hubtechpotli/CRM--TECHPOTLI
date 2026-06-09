@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { validateProductionEnv, warnIfNoOfficeIps } from './bootstrap/validate-env';
+import { resolveCorsOrigin } from './common/utils/cors-origins.util';
 import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
@@ -28,20 +29,11 @@ async function bootstrap() {
   });
 
   app.use(helmet());
-  const frontendUrl = (config.get<string>('FRONTEND_URL') || 'http://localhost:3000').replace(/\/$/, '');
   const isProduction = process.env.NODE_ENV === 'production';
   app.enableCors({
-    origin: isProduction
-      ? frontendUrl
-      : (origin, callback) => {
-          const allowed =
-            !origin ||
-            origin === frontendUrl ||
-            /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/.test(
-              origin,
-            );
-          callback(null, allowed ? origin || frontendUrl : false);
-        },
+    origin: (origin, callback) => {
+      callback(null, resolveCorsOrigin(origin));
+    },
     credentials: true,
   });
   app.setGlobalPrefix('api');

@@ -4,7 +4,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const apiOrigin = process.env.API_PROXY_TARGET?.replace(/\/$/, "").replace(/\/api$/, "");
     if (!apiOrigin) return [];
-    return [{ source: "/api/:path*", destination: `${apiOrigin}/api/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${apiOrigin}/api/:path*` },
+      { source: "/socket.io/:path*", destination: `${apiOrigin}/socket.io/:path*` },
+    ];
   },
   async headers() {
     return [

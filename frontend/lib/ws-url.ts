@@ -1,8 +1,31 @@
+function resolveWsOriginFromEnv(): string | null {
+  const wsUrl = process.env.NEXT_PUBLIC_WS_URL?.replace(/\/$/, "");
+  if (wsUrl) return wsUrl;
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (!apiUrl) return null;
+  if (apiUrl === "/api") return null;
+  return apiUrl.replace(/\/api\/?$/, "") || null;
+}
+
 /** WebSocket origin — same host as API, without /api suffix. */
 export function getWsUrl(): string {
-  if (process.env.NEXT_PUBLIC_WS_URL) {
-    return process.env.NEXT_PUBLIC_WS_URL.replace(/\/$/, '');
+  if (typeof window !== "undefined") {
+    const envOrigin = resolveWsOriginFromEnv();
+    if (envOrigin) {
+      try {
+        if (new URL(envOrigin).origin !== window.location.origin) {
+          return window.location.origin;
+        }
+        return envOrigin;
+      } catch {
+        return window.location.origin;
+      }
+    }
+    return window.location.origin;
   }
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
-  return apiUrl.replace(/\/api\/?$/, '');
+
+  const envOrigin = resolveWsOriginFromEnv();
+  if (envOrigin) return envOrigin;
+  return "http://localhost:3001";
 }

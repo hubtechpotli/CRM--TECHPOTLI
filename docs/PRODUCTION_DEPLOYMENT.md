@@ -306,10 +306,12 @@ When the frontend and API are on **different domains**, the refresh cookie may n
 
 | Variable | Platform | Example |
 |----------|----------|---------|
-| `NEXT_PUBLIC_API_URL` | Vercel | `/api` |
-| `API_PROXY_TARGET` | Vercel | `https://your-api.up.railway.app` (no `/api` suffix) |
-| `NEXT_PUBLIC_WS_URL` | Vercel | `https://your-api.up.railway.app` |
-| `FRONTEND_URL` | Railway | `https://your-app.vercel.app` (no trailing slash) |
+| `NEXT_PUBLIC_API_URL` | Vercel | `/api` (do **not** point this at Railway — use the proxy) |
+| `API_PROXY_TARGET` | Vercel | `https://crm-techpotli-production-1087.up.railway.app` (no `/api` suffix) |
+| `FRONTEND_URL` | Railway | `https://techpotli-crm.vercel.app` (no trailing slash) |
+| `CORS_ORIGINS` | Railway | Optional comma-separated extra origins (preview deploys) |
+
+`NEXT_PUBLIC_WS_URL` is optional — the app proxies Socket.IO through the Vercel domain when API env vars use a different host.
 
 Redeploy **both** Vercel and Railway after setting env vars. The browser calls `/api/*` on the Vercel domain; `app/api/[...path]/route.ts` proxies to Railway at runtime.
 

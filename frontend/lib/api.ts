@@ -1,12 +1,44 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
 
+function apiOriginFromEnv(envUrl: string): string | null {
+  const trimmed = envUrl.replace(/\/$/, "");
+  if (trimmed === "/api" || trimmed.endsWith("/api")) {
+    if (/^https?:\/\//.test(trimmed)) {
+      try {
+        return new URL(trimmed.replace(/\/api\/?$/, "") || trimmed).origin;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  if (/^https?:\/\//.test(trimmed)) {
+    try {
+      return new URL(trimmed).origin;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function resolveApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!envUrl) {
-    if (typeof window !== "undefined") return "/api";
-    return "http://localhost:3001/api";
+
+  if (typeof window !== "undefined") {
+    if (!envUrl || envUrl === "/api") return "/api";
+    const envOrigin = apiOriginFromEnv(envUrl);
+    if (envOrigin && envOrigin !== window.location.origin) {
+      return "/api";
+    }
+    const trimmed = envUrl.replace(/\/$/, "");
+    if (trimmed === "/api" || trimmed.endsWith("/api")) return trimmed;
+    if (/^https?:\/\//.test(trimmed)) return `${trimmed}/api`;
+    return "/api";
   }
+
+  if (!envUrl) return "http://localhost:3001/api";
   const trimmed = envUrl.replace(/\/$/, "");
   if (trimmed === "/api" || trimmed.endsWith("/api")) return trimmed;
   if (/^https?:\/\//.test(trimmed)) return `${trimmed}/api`;
