@@ -3,9 +3,13 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { isAxiosError } from "axios";
+import { motion } from "framer-motion";
+import { ArrowRight, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
+import { AuthCardShell } from "@/components/auth/auth-card-shell";
+import { cn } from "@/lib/utils";
 
 type LoginResponse = {
   requires2FA?: boolean;
@@ -17,6 +21,9 @@ type LoginResponse = {
   user?: { id: string; email: string; role: string; mustChangePassword?: boolean };
 };
 
+const inputClass =
+  "w-full rounded-xl border border-border/80 bg-white/60 py-2.5 pl-10 pr-3 text-sm outline-none transition-all placeholder:text-muted-foreground/60 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 dark:bg-slate-900/40 dark:focus:bg-slate-900/70";
+
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -26,6 +33,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<"email" | "password" | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -77,58 +85,141 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/30 bg-white/80 p-8 shadow-lg shadow-indigo-500/10 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/60">
+    <AuthCardShell>
       <div className="mb-8 text-center">
-        <TechPotliLogo size="lg" priority className="mx-auto" />
-        <h1 className="mt-4 text-2xl font-bold text-foreground">Sign in</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Access your workspace dashboard
-        </p>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <TechPotliLogo size="lg" priority className="mx-auto" />
+        </motion.div>
+        <motion.h1
+          className="mt-5 text-2xl font-bold tracking-tight text-foreground"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+        >
+          Welcome back
+        </motion.h1>
+        <motion.p
+          className="mt-1.5 text-sm text-muted-foreground"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
+          Sign in to access your workspace dashboard
+        </motion.p>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4">
+
+      <form onSubmit={onSubmit} className="space-y-5">
         {error ? (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm text-red-600 dark:text-red-400"
+          >
             {error}
-          </p>
+          </motion.p>
         ) : null}
-        <div>
-          <label htmlFor="email" className="mb-1 block text-sm font-medium">
-            Email
+
+        <motion.div
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.25 }}
+        >
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
+            Email address
           </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-border bg-white/50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:bg-slate-900/50"
-            placeholder="you@techpotli.com"
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="mb-1 block text-sm font-medium">
+          <div className="relative">
+            <Mail
+              className={cn(
+                "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors",
+                focusedField === "email" ? "text-primary" : "text-muted-foreground",
+              )}
+            />
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setFocusedField("email")}
+              onBlur={() => setFocusedField(null)}
+              className={inputClass}
+              placeholder="you@techpotli.com"
+            />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+        >
+          <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
             Password
           </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border border-border bg-white/50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:bg-slate-900/50"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-indigo-600 disabled:opacity-60"
+          <div className="relative">
+            <Lock
+              className={cn(
+                "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors",
+                focusedField === "password" ? "text-primary" : "text-muted-foreground",
+              )}
+            />
+            <input
+              id="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onFocus={() => setFocusedField("password")}
+              onBlur={() => setFocusedField(null)}
+              className={inputClass}
+              placeholder="Enter your password"
+            />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
         >
-          {loading ? "Signing in..." : "Continue"}
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:from-indigo-500 hover:to-indigo-600 hover:shadow-indigo-500/40 disabled:opacity-60 disabled:hover:shadow-indigo-500/25"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Continue to dashboard
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
+            </span>
+            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+          </button>
+        </motion.div>
       </form>
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Protected by TechPotli security policies · 2FA required
-      </p>
-    </div>
+
+      <motion.div
+        className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.45 }}
+      >
+        <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
+        <span>Protected by TechPotli security · 2FA required</span>
+      </motion.div>
+    </AuthCardShell>
   );
 }

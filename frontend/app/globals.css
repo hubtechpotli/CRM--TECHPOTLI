@@ -60,3 +60,8 @@ body {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--primary) 30%, transparent) transparent;
 }
+
+@keyframes auth-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}

@@ -1,11 +1,16 @@
+import { AuthBackground } from "@/components/auth/auth-background";
+
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-6 dark:from-indigo-950 dark:via-slate-950 dark:to-cyan-950">
-      <div className="w-full max-w-md">{children}</div>
+    <div className="relative flex min-h-screen items-center justify-center bg-[#b6dff7] p-6">
+      <AuthBackground />
+
+      {/* Login card — centered horizontally & vertically */}
+      <div className="relative z-10 w-full max-w-[420px]">{children}</div>
     </div>
   );
 }
