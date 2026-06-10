@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +21,8 @@ import { useAssignees } from "@/hooks/use-users";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { isTempId } from "@/lib/optimistic-mutation";
 import { PAYMENT_STATUSES } from "@/lib/types";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/pagination";
+import { PaginationFooter } from "@/components/ui/pagination-footer";
 
 type PaymentRow = Record<string, unknown> & {
   customer?: { companyName?: string };
@@ -52,6 +54,8 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [range, setRange] = useState<"" | "today" | "month">("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebouncedValue(search);
 
   const dateRange = useMemo(() => {
@@ -75,10 +79,10 @@ export default function PaymentsPage() {
       userId: userFilter || undefined,
       from: dateRange.from,
       to: dateRange.to,
-      page: 1,
-      limit: 100,
+      page,
+      limit: pageSize,
     }),
-    [debouncedSearch, statusFilter, userFilter, dateRange],
+    [debouncedSearch, statusFilter, userFilter, dateRange, page, pageSize],
   );
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -100,6 +104,12 @@ export default function PaymentsPage() {
   });
 
   const rows = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, userFilter, range, pageSize]);
 
   async function handleExport() {
     try {
@@ -284,6 +294,22 @@ export default function PaymentsPage() {
                   ),
               },
             ]}
+            footer={
+              <PaginationFooter
+                page={page}
+                totalPages={totalPages}
+                totalCount={total}
+                limit={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  if (PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])) {
+                    setPageSize(size);
+                    setPage(1);
+                  }
+                }}
+                className="px-2"
+              />
+            }
           />
         )}
       </GlassCard>

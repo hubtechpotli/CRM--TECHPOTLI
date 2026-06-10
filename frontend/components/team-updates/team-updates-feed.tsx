@@ -19,9 +19,13 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDateTime, formatLabel } from "@/lib/format";
-import { type GlobalWorkItem } from "@/lib/team-updates";
+import { type GlobalWorkItem, type TeamFeedResponse } from "@/lib/team-updates";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
+import { fetchCustomersDirectory } from "@/lib/customers-directory";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthReady } from "@/hooks/use-auth-ready";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -94,12 +98,63 @@ function resolveCustomerId(item: GlobalWorkItem): string {
   return String(item.customerId ?? item.customer?.id ?? "").trim();
 }
 
+function WorkItemUpdatesThread({
+  customerId,
+  itemId,
+  fallback,
+}: {
+  customerId: string;
+  itemId: string;
+  fallback: GlobalWorkItem["updates"];
+}) {
+  const { data: loaded } = useQuery({
+    queryKey: ["work-item-updates", customerId, itemId],
+    queryFn: async () => {
+      const res = await api.get<Array<Record<string, unknown>>>(
+        `/team-updates/work-items/${customerId}/${itemId}/updates`,
+      );
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: Boolean(customerId && itemId),
+  });
+
+  const updates = (loaded?.length ? loaded : fallback) ?? [];
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-border/40 pt-3">
+      {updates.map((u) => {
+        const authorName = (u.author as { name?: string })?.name ?? "Team member";
+        return (
+          <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <UserAvatar name={authorName} size="sm" />
+                <span className="text-xs font-semibold text-foreground">{authorName}</span>
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</span>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap">{String(u.body)}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; take?: number }) {
   const queryClient = useQueryClient();
   const { authReady } = useAuthReady();
   const { data: assignees = [] } = useAssignees();
 
   const [statusFilter, setStatusFilter] = useState("open");
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<"" | "today" | "7d" | "30d">("");
+  const [filterEmployee, setFilterEmployee] = useState("");
+  const [filterCustomer, setFilterCustomer] = useState("");
+  const [filterProject, setFilterProject] = useState("");
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [showForm, setShowForm] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [updateText, setUpdateText] = useState<Record<string, string>>({});
@@ -115,9 +170,39 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     dueDate: "",
   });
 
+  const dateParams = (() => {
+    if (!dateRange) return {};
+    const now = new Date();
+    const to = now.toISOString();
+    if (dateRange === "today") {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      return { from: start.toISOString(), to };
+    }
+    if (dateRange === "7d") {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 7);
+      return { from: start.toISOString(), to };
+    }
+    const start = new Date(now);
+    start.setDate(start.getDate() - 30);
+    return { from: start.toISOString(), to };
+  })();
+
   const feedParams = (() => {
     const p: Record<string, string> = {};
-    if (take) p.take = String(take);
+    if (compact && take) {
+      p.limit = String(take);
+      p.page = "1";
+    } else {
+      p.limit = String(pageSize);
+      p.page = String(page);
+    }
+    if (debouncedSearch.trim()) p.q = debouncedSearch.trim();
+    if (filterEmployee) p.createdById = filterEmployee;
+    if (filterCustomer) p.customerId = filterCustomer;
+    if (filterProject) p.projectId = filterProject;
+    Object.assign(p, dateParams);
     if (statusFilter === "all") p.openOnly = "0";
     else if (statusFilter === "mine") p.mine = "1";
     else if (statusFilter === "unassigned") p.unassigned = "1";
@@ -128,23 +213,43 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     return p;
   })();
 
-  const queryKey = ["team-updates-feed", statusFilter, take];
+  const queryKey = ["team-updates-feed", statusFilter, page, pageSize, debouncedSearch, dateRange, filterEmployee, filterCustomer, filterProject, take, compact];
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: feedPage, isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
-      const res = await api.get<GlobalWorkItem[]>("/team-updates/feed", { params: feedParams });
-      return Array.isArray(res.data) ? res.data : [];
+      const res = await api.get<TeamFeedResponse | GlobalWorkItem[]>("/team-updates/feed", { params: feedParams });
+      return normalizePaginated<GlobalWorkItem>(res.data);
     },
     enabled: authReady,
+  });
+
+  const items = feedPage?.data ?? [];
+
+  const { data: filterCustomers = [] } = useQuery({
+    queryKey: ["customers-directory-filter"],
+    queryFn: async () => {
+      const data = await fetchCustomersDirectory<{ id: string; companyName?: string }>({ limit: 100 });
+      return data.items;
+    },
+    enabled: authReady && !compact,
+  });
+
+  const { data: filterProjects = [] } = useQuery({
+    queryKey: ["projects-filter", filterCustomer],
+    queryFn: async () => {
+      const res = await api.get("/projects", {
+        params: { limit: 100, ...(filterCustomer ? { customerId: filterCustomer } : {}) },
+      });
+      return normalizePaginated<{ id: string; name?: string }>(res.data).data;
+    },
+    enabled: authReady && !compact,
   });
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers-directory-quick"],
     queryFn: async () => {
-      const data = await import("@/lib/customers-directory").then((m) =>
-        m.fetchCustomersDirectory<{ id: string; companyName?: string }>({ limit: 500 }),
-      );
+      const data = await fetchCustomersDirectory<{ id: string; companyName?: string }>({ limit: 100 });
       return data.items;
     },
     enabled: authReady && showForm && !compact,
@@ -231,7 +336,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     return s !== "COMPLETED" && s !== "CANCELLED";
   };
 
-  const displayItems = compact ? items.slice(0, take ?? 5) : items;
+  const displayItems = items;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -291,12 +396,74 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
             </button>
           </div>
 
+          <div className="flex flex-wrap gap-3">
+            <TextInput
+              value={search}
+              onChange={(v) => {
+                setSearch(v);
+                setPage(1);
+              }}
+              placeholder="Search company, poster, project…"
+            />
+            <SelectInput
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v as typeof dateRange);
+                setPage(1);
+              }}
+              placeholder="Any time"
+              options={[
+                { value: "", label: "Any time" },
+                { value: "today", label: "Today" },
+                { value: "7d", label: "Last 7 days" },
+                { value: "30d", label: "Last 30 days" },
+              ]}
+            />
+            <SelectInput
+              value={filterEmployee}
+              onChange={(v) => {
+                setFilterEmployee(v);
+                setPage(1);
+              }}
+              placeholder="Posted by"
+              options={[{ value: "", label: "Anyone" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]}
+            />
+            <SelectInput
+              value={filterCustomer}
+              onChange={(v) => {
+                setFilterCustomer(v);
+                setFilterProject("");
+                setPage(1);
+              }}
+              placeholder="Customer"
+              options={[
+                { value: "", label: "All customers" },
+                ...filterCustomers.map((c) => ({ value: c.id, label: String(c.companyName ?? c.id) })),
+              ]}
+            />
+            <SelectInput
+              value={filterProject}
+              onChange={(v) => {
+                setFilterProject(v);
+                setPage(1);
+              }}
+              placeholder="Project"
+              options={[
+                { value: "", label: "All projects" },
+                ...filterProjects.map((p) => ({ value: p.id, label: String(p.name ?? p.id) })),
+              ]}
+            />
+          </div>
+
           <div className="flex flex-wrap gap-1">
             {FILTER_TABS.map((tab) => (
               <button
                 key={tab.value}
                 type="button"
-                onClick={() => setStatusFilter(tab.value)}
+                onClick={() => {
+                  setStatusFilter(tab.value);
+                  setPage(1);
+                }}
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-xs font-medium transition",
                   statusFilter === tab.value
@@ -391,6 +558,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
         <div className="space-y-3">
           {displayItems.map((item) => {
             const isOpen = expanded[item.id] ?? false;
+            const updateCount = (item as GlobalWorkItem & { _count?: { updates: number } })._count?.updates ?? (item.updates ?? []).length;
             const updates = item.updates ?? [];
             const status = String(item.status ?? "OPEN");
             const manage = canManage(item);
@@ -481,35 +649,19 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
                   </div>
                 ) : null}
 
-                {!compact && updates.length > 0 ? (
+                {!compact && updateCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => setExpanded((e) => ({ ...e, [item.id]: !isOpen }))}
                     className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                   >
                     {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                    {updates.length} update{updates.length === 1 ? "" : "s"}
+                    {updateCount} update{updateCount === 1 ? "" : "s"}
                   </button>
                 ) : null}
 
                 {!compact && isOpen ? (
-                  <div className="mt-3 space-y-2 border-t border-border/40 pt-3">
-                    {updates.map((u) => {
-                      const authorName = (u.author as { name?: string })?.name ?? "Team member";
-                      return (
-                        <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <UserAvatar name={authorName} size="sm" />
-                              <span className="text-xs font-semibold text-foreground">{authorName}</span>
-                            </div>
-                            <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</span>
-                          </div>
-                          <p className="mt-2 whitespace-pre-wrap">{String(u.body)}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <WorkItemUpdatesThread customerId={customerId} itemId={item.id} fallback={updates} />
                 ) : null}
 
                 {!compact && manage ? (
@@ -536,6 +688,22 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
           })}
         </div>
       )}
+
+      {!compact && feedPage && feedPage.totalCount > 0 ? (
+        <PaginationFooter
+          page={feedPage.page}
+          totalPages={feedPage.totalPages}
+          totalCount={feedPage.totalCount}
+          limit={feedPage.limit}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            if (PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])) {
+              setPageSize(size);
+              setPage(1);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

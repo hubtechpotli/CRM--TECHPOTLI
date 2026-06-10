@@ -12,6 +12,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Modal } from "@/components/ui/modal";
 import { FormField, SelectInput, TextInput } from "@/components/ui/form-field";
 import { SaveProgress, UploadProgress } from "@/components/ui/upload-progress";
+import { DocumentPreviewModal } from "@/components/ui/document-preview-modal";
 
 type Document = Record<string, unknown>;
 
@@ -28,6 +29,7 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
   const [saveStage, setSaveStage] = useState<"idle" | "uploading" | "saving" | "done">("idle");
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
 
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ["customer-documents", customerId],
@@ -37,15 +39,9 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
     },
   });
 
-  const openDocument = async (doc: Document) => {
-    const key = String(doc.s3Key ?? "");
-    if (!key) return;
-    try {
-      const res = await api.get<{ url: string }>("/uploads/signed-url", { params: { key } });
-      window.open(res.data.url, "_blank", "noopener,noreferrer");
-    } catch {
-      alert("Could not open document. Try uploading again.");
-    }
+  const openDocument = (doc: Document) => {
+    if (!String(doc.s3Key ?? "")) return;
+    setPreviewDoc(doc);
   };
 
   const docsKey = ["customer-documents", customerId] as const;
@@ -238,6 +234,14 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
           </div>
         </form>
       </Modal>
+
+      <DocumentPreviewModal
+        open={Boolean(previewDoc)}
+        onClose={() => setPreviewDoc(null)}
+        title={String(previewDoc?.customName ?? previewDoc?.filename ?? "Document")}
+        s3Key={String(previewDoc?.s3Key ?? "")}
+        mimeType={String(previewDoc?.mimeType ?? "")}
+      />
     </div>
   );
 }

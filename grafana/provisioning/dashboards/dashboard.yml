@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: TechPotli
+    orgId: 1
+    folder: TechPotli
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

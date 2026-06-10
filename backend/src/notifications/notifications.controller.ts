@@ -7,8 +7,19 @@ export class NotificationsController {
   constructor(private notifications: NotificationsService) {}
 
   @Get()
-  list(@CurrentUser() user: JwtPayload, @Query('unread') unread?: string) {
-    return this.notifications.list(user.sub, unread === 'true');
+  list(
+    @CurrentUser() user: JwtPayload,
+    @Query('unread') unread?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+  ) {
+    return this.notifications.list(user.sub, {
+      unreadOnly: unread === 'true',
+      limit: limit ? parseInt(limit, 10) : undefined,
+      cursor,
+      page: page ? parseInt(page, 10) : undefined,
+    });
   }
 
   @Get('unread-count')

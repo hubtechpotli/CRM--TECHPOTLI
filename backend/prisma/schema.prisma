@@ -634,6 +634,7 @@ model Customer {
   favoritedBy        CustomerFavorite[]
   recentlyViewedBy   CustomerRecentlyViewed[]
   portalAccess       ClientPortalAccess[]
+  summary            CustomerSummary?
 
   @@index([companyName])
   @@index([ownerName])
@@ -1433,6 +1434,88 @@ model DashboardSnapshot {
   metricKey String   @unique
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+model DailyRevenueSnapshot {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  revenue      Decimal  @default(0) @db.Decimal(14, 2)
+  paymentCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([date])
+  @@index([date(sort: Desc)])
+}
+
+model MonthlyRevenueSnapshot {
+  id           String   @id @default(cuid())
+  year         Int
+  month        Int
+  revenue      Decimal  @default(0) @db.Decimal(14, 2)
+  paymentCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([year, month])
+  @@index([year, month(sort: Desc)])
+}
+
+model MrrSnapshot {
+  id             String   @id @default(cuid())
+  snapshotDate   DateTime @db.Date
+  mrr            Decimal  @default(0) @db.Decimal(14, 2)
+  activeServices Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([snapshotDate])
+}
+
+model EmployeePerformanceSnapshot {
+  id             String   @id @default(cuid())
+  snapshotDate   DateTime @db.Date
+  userId         String
+  name           String
+  email          String
+  role           String
+  leads          Int      @default(0)
+  customers      Int      @default(0)
+  projects       Int      @default(0)
+  convertedLeads Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([snapshotDate, userId])
+  @@index([userId])
+}
+
+model CustomerSummary {
+  customerId     String    @id
+  companyName    String
+  projectCount   Int       @default(0)
+  invoiceCount   Int       @default(0)
+  pendingAmount  Decimal   @default(0) @db.Decimal(14, 2)
+  lastActivityAt DateTime?
+  renewalCount   Int       @default(0)
+  openTasks      Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt(sort: Desc)])
+  @@index([lastActivityAt(sort: Desc)])
+}
+
+model SearchIndex {
+  id           String   @id @default(cuid())
+  entityType   String
+  entityId     String
+  title        String
+  subtitle     String?
+  searchText   String
+  assignedToId String?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([entityType])
+  @@index([assignedToId])
 }
 
 // ─── WORKFLOW AUTOMATION ─────────────────────────────────────────────────────

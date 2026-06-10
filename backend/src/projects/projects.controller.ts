@@ -10,8 +10,18 @@ export class ProjectsController {
   constructor(private projects: ProjectsService) {}
 
   @Get()
-  findAll(@Query('customerId') customerId?: string, @Query('status') status?: ProjectStatus) {
-    return this.projects.findAll({ customerId, status });
+  findAll(
+    @Query('customerId') customerId?: string,
+    @Query('status') status?: ProjectStatus,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.projects.findAll({
+      customerId,
+      status,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get('kanban')

@@ -1,11 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   Briefcase,
   CircleDot,
   FileText,
   Globe,
+  Loader2,
   Mail,
   MessageSquare,
   Phone,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDateTime, formatLabel } from "@/lib/format";
+import { DEFAULT_PAGE_SIZE, normalizePaginated } from "@/lib/pagination";
 import { GlassCard } from "@/components/ui/glass-card";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
@@ -39,13 +41,22 @@ const EVENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
 };
 
 export function CustomerTimelinePanel({ customerId }: { customerId: string }) {
-  const { data: events = [], isLoading } = useQuery({
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["customer-timeline", customerId],
-    queryFn: async () => {
-      const res = await api.get<TimelineEvent[]>(`/customers/${customerId}/timeline`);
-      return Array.isArray(res.data) ? res.data : [];
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const res = await api.get(`/customers/${customerId}/timeline`, {
+        params: {
+          limit: DEFAULT_PAGE_SIZE,
+          ...(pageParam ? { cursor: pageParam } : {}),
+        },
+      });
+      return normalizePaginated<TimelineEvent>(res.data);
     },
+    getNextPageParam: (last) => (last.hasMore && last.nextCursor ? last.nextCursor : undefined),
   });
+
+  const events = data?.pages.flatMap((p) => p.data) ?? [];
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading timeline…</p>;
@@ -93,6 +104,19 @@ export function CustomerTimelinePanel({ customerId }: { customerId: string }) {
           </GlassCard>
         );
       })}
+      {hasNextPage ? (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {isFetchingNextPage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Load more
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

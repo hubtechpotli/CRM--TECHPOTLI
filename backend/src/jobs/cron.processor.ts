@@ -5,6 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
 import { LeadStatus, PaymentStatus, QuotationStatus, RenewalStatus, WorkOrderStatus } from '@prisma/client';
+import { SnapshotRefreshService } from '../reports/snapshot-refresh.service';
+import { CustomerSummaryRefreshService } from '../customers/customer-summary-refresh.service';
+import { SearchIndexService } from '../search/search-index.service';
 
 @Processor('cron')
 export class CronProcessor extends WorkerHost {
@@ -14,6 +17,9 @@ export class CronProcessor extends WorkerHost {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private mail: MailService,
+    private snapshots: SnapshotRefreshService,
+    private customerSummaries: CustomerSummaryRefreshService,
+    private searchIndex: SearchIndexService,
   ) {
     super();
   }
@@ -32,6 +38,12 @@ export class CronProcessor extends WorkerHost {
         return this.workOrderEscalation();
       case 'quotation-expiry-check':
         return this.quotationExpiryCheck();
+      case 'dashboard-snapshot':
+        return this.snapshots.refreshAll();
+      case 'customer-summary-refresh':
+        return this.customerSummaries.refreshAll();
+      case 'search-index-rebuild':
+        return this.searchIndex.rebuildAll();
     }
   }
 

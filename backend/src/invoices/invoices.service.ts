@@ -1,4 +1,6 @@
 import { BadGatewayException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../common/number-sequence.service';
@@ -21,13 +23,34 @@ export class InvoicesService {
     private notifications: NotificationsService,
     private activityLog: ActivityLogService,
     private events: EventPublisherService,
+    @InjectQueue('pdf') private pdfQueue: Queue,
   ) {}
 
-  findAll() {
-    return this.prisma.invoice.findMany({
-      include: { customer: { select: { id: true, companyName: true } } },
-      orderBy: { invoiceDate: 'desc' },
-    });
+  private useAsyncPdf() {
+    return process.env.ENABLE_ASYNC_PDF !== 'false';
+  }
+
+  async findAll(opts?: { page?: number; limit?: number }) {
+    const limit = Math.min(opts?.limit ?? parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10), 100);
+    const page = Math.max(1, opts?.page ?? 1);
+    const skip = (page - 1) * limit;
+    const [totalCount, data] = await Promise.all([
+      this.prisma.invoice.count(),
+      this.prisma.invoice.findMany({
+        include: { customer: { select: { id: true, companyName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+    ]);
+    return {
+      data,
+      totalCount,
+      page,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+      limit,
+      hasMore: page * limit < totalCount,
+    };
   }
 
   findByCustomer(customerId: string) {
@@ -105,26 +128,34 @@ export class InvoicesService {
       include: { customer: true },
     });
 
-    const pdfBuffer = await this.pdf.generateInvoicePdf({
-      invoiceNumber,
-      invoiceDate: invoice.invoiceDate,
-      dueDate: invoice.dueDate,
-      customer: {
-        companyName: customer?.companyName || '',
-        ownerName: customer?.ownerName,
-        phone: customer?.phone,
-        email: customer?.email,
-        address: customer?.address,
-        state: customer?.state,
-        pincode: customer?.pincode,
-        gstNumber: customer?.gstNumber,
-      },
-      lineItems,
-      subtotal: Number(subtotal),
-      gstAmount: Number(gstAmount),
-      grandTotal: Number(grandTotal),
-      gstRate,
-    });
+    if (this.useAsyncPdf()) {
+      const job = await this.pdfQueue.add('generate-invoice-pdf', {
+        invoiceId: invoice.id,
+        userId: createdById,
+      });
+      const admins = await this.prisma.user.findMany({ where: { role: 'SUPER_ADMIN' } });
+      await this.notifications.notifyMany(
+        admins.map((a) => a.id),
+        {
+          type: 'INVOICE_CREATED',
+          title: 'New invoice',
+          message: invoiceNumber,
+          link: `/invoices/${invoice.id}`,
+        },
+      );
+      await this.activityLog.log({
+        userId: createdById,
+        action: 'INVOICE_CREATED',
+        module: 'invoice',
+        recordId: invoice.id,
+        newValue: { invoiceNumber, customerId: data.customerId },
+      });
+      const result = await this.findOne(invoice.id);
+      if (!result) throw new NotFoundException('Invoice not found after create');
+      return { ...result, pdfJobId: job.id, pdfStatus: 'queued' as const };
+    }
+
+    const pdfBuffer = await this.buildInvoicePdfBuffer(invoice, customer, lineItems, gstRate, subtotal, gstAmount, grandTotal);
     const upload = await this.s3.upload(pdfBuffer, `${invoiceNumber}.pdf`, 'application/pdf', 'invoices');
     await this.prisma.invoice.update({ where: { id: invoice.id }, data: { pdfUrl: upload.key } });
 
@@ -153,6 +184,66 @@ export class InvoicesService {
       }
     }
     return this.findOne(invoice.id);
+  }
+
+  private async buildInvoicePdfBuffer(
+    invoice: { invoiceNumber: string; invoiceDate: Date; dueDate: Date },
+    customer: {
+      companyName?: string | null;
+      ownerName?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      address?: string | null;
+      state?: string | null;
+      pincode?: string | null;
+      gstNumber?: string | null;
+    } | null | undefined,
+    lineItems: Array<{ name: string; qty: number; rate: number; amount: number }>,
+    gstRate: number,
+    subtotal: number,
+    gstAmount: number,
+    grandTotal: number,
+  ) {
+    return this.pdf.generateInvoicePdf({
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      dueDate: invoice.dueDate,
+      customer: {
+        companyName: customer?.companyName || '',
+        ownerName: customer?.ownerName,
+        phone: customer?.phone,
+        email: customer?.email,
+        address: customer?.address,
+        state: customer?.state,
+        pincode: customer?.pincode,
+        gstNumber: customer?.gstNumber,
+      },
+      lineItems,
+      subtotal: Number(subtotal),
+      gstAmount: Number(gstAmount),
+      grandTotal: Number(grandTotal),
+      gstRate,
+    });
+  }
+
+  async getPdfStatus(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      select: { pdfUrl: true },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    return { status: invoice.pdfUrl ? 'ready' : 'processing' };
+  }
+
+  async enqueuePdfGeneration(id: string, userId: string) {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    const job = await this.pdfQueue.add('generate-invoice-pdf', {
+      invoiceId: id,
+      userId,
+      replaceOldKey: this.extractS3Key(invoice.pdfUrl),
+    });
+    return { jobId: job.id, status: 'queued' };
   }
 
   private async getInvoicePdfBuffer(invoice: {
@@ -257,7 +348,11 @@ export class InvoicesService {
     return result;
   }
 
-  async regeneratePdf(id: string) {
+  async regeneratePdf(id: string, userId?: string) {
+    if (this.useAsyncPdf() && userId) {
+      return this.enqueuePdfGeneration(id, userId);
+    }
+
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
       include: { customer: true },
@@ -265,26 +360,15 @@ export class InvoicesService {
     if (!invoice) throw new NotFoundException('Invoice not found');
 
     const lineItems = invoice.lineItems as Array<{ name: string; qty: number; rate: number; amount: number }>;
-    const pdfBuffer = await this.pdf.generateInvoicePdf({
-      invoiceNumber: invoice.invoiceNumber,
-      invoiceDate: invoice.invoiceDate,
-      dueDate: invoice.dueDate,
-      customer: {
-        companyName: invoice.customer?.companyName || '',
-        ownerName: invoice.customer?.ownerName,
-        phone: invoice.customer?.phone,
-        email: invoice.customer?.email,
-        address: invoice.customer?.address,
-        state: invoice.customer?.state,
-        pincode: invoice.customer?.pincode,
-        gstNumber: invoice.customer?.gstNumber,
-      },
+    const pdfBuffer = await this.buildInvoicePdfBuffer(
+      invoice,
+      invoice.customer,
       lineItems,
-      subtotal: Number(invoice.subtotal),
-      gstAmount: Number(invoice.gstAmount),
-      grandTotal: Number(invoice.grandTotal),
-      gstRate: Number(invoice.gstRate),
-    });
+      Number(invoice.gstRate),
+      Number(invoice.subtotal),
+      Number(invoice.gstAmount),
+      Number(invoice.grandTotal),
+    );
     const oldKey = this.extractS3Key(invoice.pdfUrl);
     const upload = await this.s3.upload(pdfBuffer, `${invoice.invoiceNumber}.pdf`, 'application/pdf', 'invoices');
     if (oldKey && oldKey !== upload.key) {

@@ -23,6 +23,16 @@ export type GlobalWorkItem = Record<string, unknown> & {
   updates?: Array<Record<string, unknown> & { body?: string; author?: { name?: string }; createdAt?: string }>;
 };
 
+export type TeamFeedResponse = {
+  data: GlobalWorkItem[];
+  totalCount: number;
+  page: number;
+  totalPages: number;
+  limit: number;
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
 export function invalidateTeamUpdates(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ["team-updates-summary"] });
   queryClient.invalidateQueries({ queryKey: ["team-updates-feed"] });

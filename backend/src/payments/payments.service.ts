@@ -85,7 +85,7 @@ export class PaymentsService {
     },
   ) {
     const page = Math.max(1, filters.page ?? 1);
-    const limit = Math.min(100, Math.max(1, filters.limit ?? 50));
+    const limit = Math.min(100, Math.max(1, filters.limit ?? parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10)));
     const where: Prisma.PaymentWhereInput = {};
 
     if (!this.isAdmin(userRole)) {
@@ -199,7 +199,7 @@ export class PaymentsService {
     };
   }
 
-  async findOne(id: string, userRole: string, userId: string) {
+  async findOne(id: string, userRole: string, userId: string, opts?: { includeProof?: boolean }) {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       include: paymentInclude,
@@ -208,7 +208,8 @@ export class PaymentsService {
     if (!this.isAdmin(userRole) && payment.createdById !== userId) {
       throw new ForbiddenException('You can only view your own payments');
     }
-    return this.attachProofUrl(payment);
+    if (opts?.includeProof) return this.attachProofUrl(payment);
+    return { ...payment, proofUrl: null };
   }
 
   async create(dto: CreatePaymentDto, createdById: string) {

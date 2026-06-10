@@ -40,6 +40,8 @@ import {
   LeadPriorityBadge,
   LeadStatusBadge,
 } from "@/components/leads/lead-badges";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/pagination";
+import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { StatusTabs } from "@/components/dashboard/status-tabs";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -87,6 +89,7 @@ export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const deleteMutation = useOptimisticMutation({
@@ -133,13 +136,13 @@ export default function LeadsPage() {
   const stats = useMemo(() => computeKanbanStats(kanbanData), [kanbanData]);
 
   const { data: leadsData, isLoading } = useQuery({
-    queryKey: ["leads", statusFilter, assigneeFilter, page],
+    queryKey: ["leads", statusFilter, assigneeFilter, page, pageSize],
     enabled: authReady && view === "list",
     queryFn: async () => {
       const res = await api.get<PaginatedLeads>("/leads", {
         params: {
           page,
-          limit: 50,
+          limit: pageSize,
           status: statusFilter || undefined,
           assignedToId: assigneeFilter || undefined,
         },
@@ -150,7 +153,7 @@ export default function LeadsPage() {
 
   const rows = leadsData?.items ?? [];
   const total = leadsData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / 50));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const listActions = (
     <div className="flex items-center gap-2">
@@ -375,31 +378,19 @@ export default function LeadsPage() {
               </div>
             }
             footer={
-              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span>
-                  Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total} leads
-                </span>
-                {totalPages > 1 ? (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={page <= 1}
-                      onClick={() => setPage(page - 1)}
-                      className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage(page + 1)}
-                      className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <PaginationFooter
+                page={page}
+                totalPages={totalPages}
+                totalCount={total}
+                limit={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  if (PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])) {
+                    setPageSize(size);
+                    setPage(1);
+                  }
+                }}
+              />
             }
           />
         </SectionCard>

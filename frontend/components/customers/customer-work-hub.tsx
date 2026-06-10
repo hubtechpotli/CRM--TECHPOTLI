@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { appendListItem, createTempId, patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
@@ -15,6 +15,7 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { DEFAULT_PAGE_SIZE, normalizePaginated } from "@/lib/pagination";
 import { formatDateTime, formatLabel } from "@/lib/format";
 import { useAssignees } from "@/hooks/use-users";
 import { cn } from "@/lib/utils";
@@ -113,16 +114,27 @@ export function CustomerWorkHub({
 
   const queryKey = ["customer-work-items", customerId, statusFilter];
 
-  const { data: items = [], isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey,
-    queryFn: async () => {
-      const params: Record<string, string> = {};
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const params: Record<string, string> = { limit: String(DEFAULT_PAGE_SIZE) };
       if (statusFilter === "mine") params.mine = "1";
       else if (statusFilter) params.status = statusFilter;
-      const res = await api.get<WorkItem[]>(`/customers/${customerId}/work-items`, { params });
-      return Array.isArray(res.data) ? res.data : [];
+      if (pageParam) params.cursor = pageParam;
+      const res = await api.get(`/customers/${customerId}/work-items`, { params });
+      return normalizePaginated<WorkItem>(res.data);
     },
+    getNextPageParam: (last) => (last.hasMore && last.nextCursor ? last.nextCursor : undefined),
   });
+
+  const items = data?.pages.flatMap((p) => p.data) ?? [];
 
   const { data: projects = [] } = useQuery({
     queryKey: ["customer-projects", customerId],
@@ -497,6 +509,20 @@ export function CustomerWorkHub({
           })}
         </div>
       )}
+
+      {!compact && hasNextPage ? (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {isFetchingNextPage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Load more
+          </button>
+        </div>
+      ) : null}
 
       {compact && items.length > 5 && onViewAll ? (
         <button type="button" onClick={onViewAll} className="text-sm font-medium text-primary hover:underline">

@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { io, Socket } from "socket.io-client";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
-import { getWsUrl } from "@/lib/ws-url";
+import { useSocket } from "@/lib/socket-provider";
 import { invalidateTeamUpdates } from "@/lib/team-updates";
+import { DEFAULT_PAGE_SIZE, normalizePaginated } from "@/lib/pagination";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
@@ -24,8 +24,6 @@ type Notification = {
   createdAt: string;
 };
 
-const wsUrl = getWsUrl();
-
 function invalidateNotifications(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ["notifications-count"] });
   queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -34,6 +32,7 @@ function invalidateNotifications(queryClient: ReturnType<typeof useQueryClient>)
 
 export function NotificationBell() {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const socket = useSocket();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -52,14 +51,13 @@ export function NotificationBell() {
     queryKey: ["notifications"],
     enabled: !!accessToken && open,
     queryFn: async () => {
-      const res = await api.get<Notification[]>("/notifications");
-      return res.data;
+      const res = await api.get("/notifications", { params: { limit: DEFAULT_PAGE_SIZE } });
+      return normalizePaginated<Notification>(res.data).data;
     },
   });
 
   useEffect(() => {
-    if (!accessToken) return;
-    const socket: Socket = io(wsUrl, { auth: { token: accessToken } });
+    if (!socket) return;
     const onNew = () => invalidateNotifications(queryClient);
     socket.on("notification", onNew);
     socket.on("work_order:new", onNew);
@@ -68,9 +66,8 @@ export function NotificationBell() {
       socket.off("notification", onNew);
       socket.off("work_order:new", onNew);
       socket.off("work_item:new", onNew);
-      socket.disconnect();
     };
-  }, [accessToken, queryClient]);
+  }, [socket, queryClient]);
 
   async function markRead(id: string) {
     await api.patch(`/notifications/${id}/read`);

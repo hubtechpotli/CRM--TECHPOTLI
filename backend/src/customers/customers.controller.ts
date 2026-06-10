@@ -131,10 +131,16 @@ export class CustomersController {
     @CurrentUser() user: JwtPayload,
     @Query('status') status?: CustomerWorkItemStatus,
     @Query('mine') mine?: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('cursor') cursor?: string,
   ) {
     return this.customers.listWorkItems(id, {
       status,
       mine: mine === '1' ? user.sub : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      cursor,
     });
   }
 
@@ -175,8 +181,17 @@ export class CustomersController {
   }
 
   @Get(':id/timeline')
-  getTimeline(@Param('id') id: string) {
-    return this.customers.getTimeline(id);
+  getTimeline(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.customers.getTimeline(id, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      cursor,
+    });
   }
 
   @Post(':id/recalc-score')

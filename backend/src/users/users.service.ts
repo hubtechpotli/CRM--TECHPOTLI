@@ -70,11 +70,15 @@ export class UsersService {
     if (data.role && actorRole) {
       this.assertCanAssignRole(actorRole, data.role);
     }
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data,
       select: userSelect,
     });
+    if (data.role !== undefined || data.allowRemoteAccess !== undefined || data.allowedIPs !== undefined) {
+      await this.sessions.clearUserPermissions(id);
+    }
+    return updated;
   }
 
   async create(data: CreateUserDto, actorRole: UserRole) {

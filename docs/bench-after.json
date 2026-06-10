@@ -1,0 +1,111 @@
+{
+  "generatedAt": "2026-06-10T18:21:48.423Z",
+  "baseURL": "http://localhost:3001/api",
+  "iterations": 5,
+  "results": [
+    {
+      "name": "Dashboard (/reports/crm-insights)",
+      "samples": 5,
+      "p50": 2335,
+      "p95": 2903,
+      "p99": 2903,
+      "min": 2002,
+      "max": 2903,
+      "avg": 2407,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Dashboard KPIs (/reports/dashboard)",
+      "samples": 5,
+      "p50": 2261,
+      "p95": 3221,
+      "p99": 3221,
+      "min": 2141,
+      "max": 3221,
+      "avg": 2430,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Customers (/customers/directory)",
+      "samples": 5,
+      "p50": 2559,
+      "p95": 2794,
+      "p99": 2794,
+      "min": 2486,
+      "max": 2794,
+      "avg": 2592,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Projects (/projects)",
+      "samples": 5,
+      "p50": 2877,
+      "p95": 3152,
+      "p99": 3152,
+      "min": 2654,
+      "max": 3152,
+      "avg": 2919,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Reports MRR (/reports/mrr)",
+      "samples": 5,
+      "p50": 2207,
+      "p95": 2288,
+      "p99": 2288,
+      "min": 2118,
+      "max": 2288,
+      "avg": 2208,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Reports employee-perf",
+      "samples": 5,
+      "p50": 2137,
+      "p95": 2494,
+      "p99": 2494,
+      "min": 2035,
+      "max": 2494,
+      "avg": 2191,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Search (/search?q=test)",
+      "samples": 5,
+      "p50": 2557,
+      "p95": 2722,
+      "p99": 2722,
+      "min": 2111,
+      "max": 2722,
+      "avg": 2524,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    },
+    {
+      "name": "Team Updates (/team-updates/feed)",
+      "samples": 5,
+      "p50": 2150,
+      "p95": 2440,
+      "p99": 2440,
+      "min": 2059,
+      "max": 2440,
+      "avg": 2236,
+      "errors": 0,
+      "lastStatus": 200,
+      "timingP50": {}
+    }
+  ]
+}

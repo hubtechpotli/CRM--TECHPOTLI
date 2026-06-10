@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
@@ -29,6 +30,40 @@ export class UploadsController {
     }
     const result = await this.s3.upload(file.buffer, file.originalname, file.mimetype);
     return { ...result, filename: file.originalname, size: file.size };
+  }
+
+  private static readonly MAX_BYTES = 20 * 1024 * 1024;
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('presign')
+  async presign(
+    @Body() body: { filename?: string; mimeType?: string; size?: number; folder?: string },
+  ) {
+    const filename = body.filename?.trim();
+    const mimeType = body.mimeType?.trim() || 'application/octet-stream';
+    if (!filename) throw new BadRequestException('filename is required');
+    if (body.size != null && body.size > UploadsController.MAX_BYTES) {
+      throw new BadRequestException('File exceeds 20MB limit');
+    }
+    if (process.env.ENABLE_PRESIGNED_UPLOAD === 'false') {
+      throw new BadRequestException('Presigned upload disabled');
+    }
+    return this.s3.getPresignedUploadUrl(filename, mimeType, body.folder || 'files');
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('complete')
+  async complete(@Body() body: { key?: string; filename?: string; mimeType?: string; size?: number }) {
+    const key = body.key?.trim();
+    if (!key) throw new BadRequestException('key is required');
+    const exists = await this.s3.objectExists(key);
+    if (!exists) throw new BadRequestException('Upload not found in storage');
+    return {
+      key,
+      filename: body.filename || key.split('/').pop(),
+      mimeType: body.mimeType,
+      size: body.size,
+    };
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
+import { PaginationFooter } from "@/components/ui/pagination-footer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -21,16 +23,18 @@ type InvoiceRow = Record<string, unknown> & {
 export default function InvoicesPage() {
   const router = useRouter();
   const [showNew, setShowNew] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["invoices"],
+    queryKey: ["invoices", page, pageSize],
     queryFn: async () => {
-      const res = await api.get<InvoiceRow[]>("/invoices");
-      return res.data;
+      const res = await api.get("/invoices", { params: { page, limit: pageSize } });
+      return normalizePaginated<InvoiceRow>(res.data);
     },
   });
 
-  const rows = Array.isArray(data) ? data : [];
+  const rows = data?.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -97,6 +101,22 @@ export default function InvoicesPage() {
             ]}
           />
         )}
+        {!isLoading && !error ? (
+          <PaginationFooter
+            page={page}
+            totalPages={data?.totalPages ?? 1}
+            totalCount={data?.totalCount ?? 0}
+            limit={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              if (PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])) {
+                setPageSize(size);
+                setPage(1);
+              }
+            }}
+            className="px-4 pb-4"
+          />
+        ) : null}
       </GlassCard>
       <Modal open={showNew} onClose={() => setShowNew(false)} title="New invoice" size="xl">
         <InvoiceForm

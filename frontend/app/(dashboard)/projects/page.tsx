@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Columns3, List, Plus } from "lucide-react";
 import { api } from "@/lib/api";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
 import { PROJECT_STATUSES } from "@/lib/types";
+import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { StatusTabs } from "@/components/dashboard/status-tabs";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -46,25 +48,35 @@ export default function ProjectsPage() {
   const searchParams = useSearchParams();
   const [view, setView] = useState<"list" | "kanban">("list");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [showNewProject, setShowNewProject] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("new") === "1") setShowNewProject(true);
   }, [searchParams]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, pageSize]);
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["projects"],
+    queryKey: ["projects", statusFilter, page, pageSize],
     queryFn: async () => {
-      const res = await api.get<ProjectRow[]>("/projects");
-      return res.data;
+      const res = await api.get("/projects", {
+        params: {
+          page,
+          limit: pageSize,
+          ...(statusFilter ? { status: statusFilter } : {}),
+        },
+      });
+      return normalizePaginated<ProjectRow>(res.data);
     },
   });
 
-  const rows = useMemo(() => {
-    const allRows = Array.isArray(data) ? data : [];
-    if (!statusFilter) return allRows;
-    return allRows.filter((r) => r.status === statusFilter);
-  }, [data, statusFilter]);
+  const rows = data?.data ?? [];
+  const totalCount = data?.totalCount ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div className="space-y-6">
@@ -186,9 +198,20 @@ export default function ProjectsPage() {
                 },
               ]}
               footer={
-                <p className="text-xs text-muted-foreground">
-                  Showing {rows.length} project{rows.length === 1 ? "" : "s"}
-                </p>
+                <PaginationFooter
+                  page={page}
+                  totalPages={totalPages}
+                  totalCount={totalCount}
+                  limit={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(size) => {
+                    if (PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])) {
+                      setPageSize(size);
+                      setPage(1);
+                    }
+                  }}
+                  className="px-4"
+                />
               }
             />
           )}
