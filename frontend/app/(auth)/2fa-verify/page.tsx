@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function TwoFactorVerifyPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const setAuth = useAuthStore((s) => s.setAuth);
   const setPending2FA = useAuthStore((s) => s.setPending2FA);
   const tempToken = useAuthStore((s) => s.tempToken);
@@ -44,6 +47,7 @@ export default function TwoFactorVerifyPage() {
         data.sessionId,
         14 * 60_000,
       );
+      void prefetchAfterAuth(queryClient, data.user.role);
       if (data.user.mustChangePassword) {
         router.replace("/security/change-password");
       } else {

@@ -49,6 +49,7 @@ import { SelectInput } from "@/components/ui/form-field";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -77,6 +78,7 @@ export default function LeadsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const adminView = isAdmin(user?.role);
   const canDelete = isSuperAdmin(user?.role);
   const { data: assignees = [] } = useAssignees();
@@ -120,7 +122,7 @@ export default function LeadsPage() {
 
   const { data: kanbanData } = useQuery({
     queryKey: ["leads-kanban"],
-    enabled: view === "kanban",
+    enabled: authReady && view === "kanban",
     queryFn: async () => {
       const res = await api.get<Record<string, LeadRow[]>>("/leads/kanban");
       return res.data;
@@ -132,7 +134,7 @@ export default function LeadsPage() {
 
   const { data: leadsData, isLoading } = useQuery({
     queryKey: ["leads", statusFilter, assigneeFilter, page],
-    enabled: view === "list",
+    enabled: authReady && view === "list",
     queryFn: async () => {
       const res = await api.get<PaginatedLeads>("/leads", {
         params: {

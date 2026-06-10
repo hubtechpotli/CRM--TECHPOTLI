@@ -38,17 +38,22 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
 
     let cancelled = false;
-    (async () => {
-      let token = restoreSessionToken();
+    const token = restoreSessionToken();
+    const hasToken = !!token && !isJwtExpired(token);
 
+    if (hasToken) {
+      setBootstrapping(false);
+      if (!isInAuthGracePeriod() && isJwtExpired(token, 3 * 60_000)) {
+        void refreshAccessToken();
+      }
+      return;
+    }
+
+    (async () => {
       try {
-        if (!token || isJwtExpired(token)) {
-          token = (await refreshAccessToken()) ?? restoreSessionToken();
-        } else if (!isInAuthGracePeriod() && isJwtExpired(token, 3 * 60_000)) {
-          void refreshAccessToken();
-        }
+        await refreshAccessToken();
       } catch {
-        token = restoreSessionToken();
+        restoreSessionToken();
       }
 
       if (cancelled) return;

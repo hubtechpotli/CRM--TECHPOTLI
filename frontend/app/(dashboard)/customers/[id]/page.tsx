@@ -17,6 +17,8 @@ import { ProjectForm } from "@/components/projects/project-form";
 import { Modal } from "@/components/ui/modal";
 import { CardSkeleton, CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
+import { queryRetryDelay, shouldRetryQuery } from "@/lib/query-retry";
 import { isSuperAdmin } from "@/lib/roles";
 import { getApiErrorMessage } from "@/lib/api-error";
 
@@ -117,6 +119,7 @@ export default function CustomerDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const canDelete = isSuperAdmin(user?.role);
   const id = String(params.id);
   const [tab, setTab] = useState<Tab>("overview");
@@ -125,13 +128,15 @@ export default function CustomerDetailPage() {
   const [emailDraft, setEmailDraft] = useState<{ subject: string; body: string; to: string | null } | null>(null);
   const [favorited, setFavorited] = useState(false);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, failureCount } = useQuery({
     queryKey: ["customer", id],
     queryFn: async () => {
       const res = await api.get<CustomerDetail>(`/customers/${id}`);
       return res.data;
     },
-    enabled: !isTempId(id),
+    enabled: authReady && !isTempId(id),
+    retry: shouldRetryQuery,
+    retryDelay: queryRetryDelay,
   });
 
   const { data: favorites = [] } = useQuery({
@@ -140,7 +145,7 @@ export default function CustomerDetailPage() {
       const res = await api.get<{ customer: { id: string } }[]>("/customers/favorites");
       return res.data;
     },
-    enabled: !isLoading,
+    enabled: authReady && !isLoading && !!data,
   });
 
   useEffect(() => {
@@ -202,18 +207,36 @@ export default function CustomerDetailPage() {
     return <p className="text-sm text-muted-foreground">Saving new customer…</p>;
   }
 
-  if (isLoading) {
+  if (!authReady || isLoading || (isFetching && !data)) {
     return <CustomerDetailSkeleton />;
   }
-  if (error || !data) {
-    if (isAxiosError(error) && !error.response) {
+
+  if (error) {
+    if (isAxiosError(error)) {
+      if (!error.response) {
+        return (
+          <p className="text-sm text-red-500">
+            Cannot reach the API server. Start the backend with <code>npm run start:dev</code> in the backend folder.
+          </p>
+        );
+      }
+      if (error.response.status === 404) {
+        return <p className="text-sm text-red-500">Customer not found</p>;
+      }
+      if (isFetching || failureCount < 2) {
+        return <p className="text-sm text-muted-foreground">Loading customer…</p>;
+      }
       return (
         <p className="text-sm text-red-500">
-          Cannot reach the API server. Start the backend with <code>npm run start:dev</code> in the backend folder.
+          {getApiErrorMessage(error, "Could not load customer. Please refresh the page.")}
         </p>
       );
     }
-    return <p className="text-sm text-red-500">Customer not found</p>;
+    return <p className="text-sm text-red-500">Could not load customer. Please refresh the page.</p>;
+  }
+
+  if (!data) {
+    return <CustomerDetailSkeleton />;
   }
 
   return (

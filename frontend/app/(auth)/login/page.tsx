@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { motion } from "framer-motion";
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
@@ -10,6 +11,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
 import { AuthCardShell } from "@/components/auth/auth-card-shell";
 import { cn } from "@/lib/utils";
+import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
 
 type LoginResponse = {
   requires2FA?: boolean;
@@ -26,6 +28,7 @@ const inputClass =
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const setAuth = useAuthStore((s) => s.setAuth);
   const setPending2FA = useAuthStore((s) => s.setPending2FA);
   const setPending2FASetup = useAuthStore((s) => s.setPending2FASetup);
@@ -70,6 +73,7 @@ export default function LoginPage() {
           data.sessionId,
           14 * 60_000,
         );
+        void prefetchAfterAuth(queryClient, data.user.role);
         if (data.user.mustChangePassword) {
           router.push("/security/change-password");
         } else {

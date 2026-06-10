@@ -18,6 +18,7 @@ import { SelectInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export default function CustomersPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const adminView = isAdmin(user?.role);
   const canDelete = isSuperAdmin(user?.role);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export default function CustomersPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["customers-directory", params],
     queryFn: () => fetchCustomersDirectory<CustomerRow>(params),
+    enabled: authReady,
   });
 
   const rows = data?.items ?? [];

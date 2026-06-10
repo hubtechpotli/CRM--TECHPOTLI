@@ -15,6 +15,7 @@ import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { PaymentForm } from "@/components/payments/payment-form";
 import { SelectInput, TextInput } from "@/components/ui/form-field";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin } from "@/lib/roles";
 import { useAssignees } from "@/hooks/use-users";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -42,6 +43,7 @@ type SummaryResponse = {
 export default function PaymentsPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const adminView = isAdmin(user?.role);
   const { data: assignees = [] } = useAssignees();
   const [showNew, setShowNew] = useState(false);
@@ -84,6 +86,7 @@ export default function PaymentsPage() {
       const res = await api.get<PaymentsResponse>("/payments", { params: queryParams });
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: summary } = useQuery({
@@ -92,7 +95,7 @@ export default function PaymentsPage() {
       const res = await api.get<SummaryResponse>("/payments/summary");
       return res.data;
     },
-    enabled: adminView,
+    enabled: authReady && adminView,
   });
 
   const rows = data?.items ?? [];

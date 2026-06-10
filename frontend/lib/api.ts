@@ -77,18 +77,19 @@ function getApiErrorMessage(error: unknown): string | null {
 }
 
 function shouldForceLogout(error: AxiosError): boolean {
-  if (error.response?.status === 401) return true;
   if (error.response?.status === 403) {
     const msg = getApiErrorMessage(error)?.toLowerCase() ?? "";
     return (
       msg.includes("office network") ||
-      msg.includes("network changed") ||
-      msg.includes("browser changed") ||
-      msg.includes("session ended") ||
       msg.includes("two-factor authentication required")
     );
   }
   return false;
+}
+
+function shouldForceLogoutOnRefresh(error: AxiosError): boolean {
+  if (error.response?.status === 401) return true;
+  return shouldForceLogout(error);
 }
 
 function hasValidAccessToken(): boolean {
@@ -151,7 +152,7 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (original?.url?.includes("/auth/refresh") && shouldForceLogout(error)) {
+    if (original?.url?.includes("/auth/refresh") && shouldForceLogoutOnRefresh(error)) {
       if (!hasValidAccessToken()) {
         redirectToLogin();
       }

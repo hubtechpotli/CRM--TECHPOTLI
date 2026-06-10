@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { isJwtExpired } from "@/lib/jwt";
 
 const SESSION_TOKEN_KEY = "techpotli-access-token";
-const AUTH_GRACE_MS = 2 * 60_000;
+const AUTH_GRACE_MS = 3 * 60_000;
 
 export type AuthUser = {
   id: string;

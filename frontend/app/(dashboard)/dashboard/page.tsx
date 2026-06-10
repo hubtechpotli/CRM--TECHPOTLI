@@ -7,6 +7,7 @@ import { Calendar, IndianRupee, Receipt, Trophy, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { KpiSparklineCard } from "@/components/dashboard/kpi-sparkline-card";
 import { LeadsOverviewChart } from "@/components/dashboard/leads-overview-chart";
 import { LeadSourceChart } from "@/components/dashboard/lead-source-chart";
@@ -57,6 +58,7 @@ type ActivityItem = {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const adminView = isAdmin(user?.role);
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -66,6 +68,7 @@ export default function DashboardPage() {
       const res = await api.get<CrmInsights>("/reports/crm-insights");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: activityData, isLoading: activityLoading } = useQuery({
@@ -74,6 +77,7 @@ export default function DashboardPage() {
       const res = await api.get<{ items: ActivityItem[] }>("/activity-log?take=6");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: collectionsSummary, isLoading: collectionsLoading } = useQuery({
@@ -85,7 +89,7 @@ export default function DashboardPage() {
       }>("/payments/summary");
       return res.data;
     },
-    enabled: adminView,
+    enabled: authReady && adminView,
   });
 
   const filteredLeads = useMemo(() => {
