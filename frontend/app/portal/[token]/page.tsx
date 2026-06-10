@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { GlassCard } from "@/components/ui/glass-card";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
+import { formatDate } from "@/lib/format";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
@@ -80,7 +81,7 @@ export default function PortalPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-cyan-50">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Loading portal…</p>
       </div>
     );
@@ -88,7 +89,7 @@ export default function PortalPage() {
 
   if (error || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-cyan-50">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <GlassCard className="max-w-md text-center">
           <p className="text-lg font-semibold">Invalid or expired link</p>
           <p className="mt-2 text-sm text-muted-foreground">Please contact TechPotli for a new portal link.</p>
@@ -100,7 +101,7 @@ export default function PortalPage() {
   const displayTickets = tab === "support" && tickets.length ? tickets : data.supportTickets ?? [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-6 dark:from-indigo-950 dark:via-background dark:to-cyan-950">
+    <div className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-5xl space-y-6">
         <header className="text-center">
           <TechPotliLogo size="md" className="mx-auto" />
@@ -197,7 +198,7 @@ export default function PortalPage() {
               {(data.payments ?? []).map((p) => (
                 <li key={String(p.id)} className="flex justify-between border-b border-border/40 pb-2">
                   <span>₹{String(p.paidAmount ?? p.totalAmount ?? 0)}</span>
-                  <span className="text-muted-foreground">{String(p.status ?? "—")} · {p.createdAt ? new Date(String(p.createdAt)).toLocaleDateString() : "—"}</span>
+                  <span className="text-muted-foreground">{String(p.status ?? "—")} · {p.createdAt ? formatDate(p.createdAt) : "—"}</span>
                 </li>
               ))}
               {!data.payments?.length ? <li className="text-muted-foreground">No payments</li> : null}
@@ -212,7 +213,7 @@ export default function PortalPage() {
               {(data.renewals ?? []).map((r) => (
                 <li key={String(r.id)} className="flex justify-between border-b border-border/40 pb-2">
                   <span>{String(r.serviceName ?? r.type ?? "Renewal")}</span>
-                  <span>{r.renewalDate ? new Date(String(r.renewalDate)).toLocaleDateString() : "—"}</span>
+                  <span>{r.renewalDate ? formatDate(r.renewalDate) : "—"}</span>
                 </li>
               ))}
               {!data.renewals?.length ? <li className="text-muted-foreground">No renewals</li> : null}
@@ -228,7 +229,7 @@ export default function PortalPage() {
                 <li key={String(q.id)} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
                   <span className="font-medium">{String(q.quotationNumber ?? "—")}</span>
                   <span>₹{String(q.grandTotal ?? 0)}</span>
-                  <span className="text-muted-foreground">Valid until {q.validUntil ? new Date(String(q.validUntil)).toLocaleDateString() : "—"}</span>
+                  <span className="text-muted-foreground">Valid until {q.validUntil ? formatDate(q.validUntil) : "—"}</span>
                   {q.approvalToken ? (
                     <a
                       href={`/quote/approve/${q.approvalToken}`}

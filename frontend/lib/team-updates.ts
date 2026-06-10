@@ -37,3 +37,20 @@ export function invalidateTeamUpdates(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ["team-updates-summary"] });
   queryClient.invalidateQueries({ queryKey: ["team-updates-feed"] });
 }
+
+/** Instant UI bump after posting — reconciled on background invalidate. */
+export function optimisticBumpTeamSummary(
+  queryClient: QueryClient,
+  opts: { assignedToId?: string; currentUserId?: string },
+) {
+  queryClient.setQueryData<TeamUpdatesSummary>(["team-updates-summary"], (old) => {
+    if (!old) return old;
+    const mine = opts.assignedToId && opts.assignedToId === opts.currentUserId;
+    return {
+      openTotal: old.openTotal + 1,
+      assignedToMe: mine ? old.assignedToMe + 1 : old.assignedToMe,
+      unassignedOpen: !opts.assignedToId ? old.unassignedOpen + 1 : old.unassignedOpen,
+      newToday: old.newToday + 1,
+    };
+  });
+}

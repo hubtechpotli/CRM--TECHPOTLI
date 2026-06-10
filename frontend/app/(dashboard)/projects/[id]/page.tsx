@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
 import { PROJECT_STATUSES } from "@/lib/types";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 type Tab = "overview" | "comments" | "time-logs" | "work-order";
 
@@ -210,7 +211,7 @@ export default function ProjectDetailPage() {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Due date</dt>
-              <dd>{data.dueDate ? new Date(String(data.dueDate)).toLocaleDateString() : "—"}</dd>
+              <dd>{data.dueDate ? formatDate(data.dueDate) : "—"}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Progress</dt>
@@ -249,7 +250,7 @@ export default function ProjectDetailPage() {
               {wo.acceptedAt ? (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Accepted</dt>
-                  <dd>{new Date(String(wo.acceptedAt)).toLocaleString()}</dd>
+                  <dd>{formatDateTime(wo.acceptedAt)}</dd>
                 </div>
               ) : null}
             </dl>
@@ -292,7 +293,7 @@ export default function ProjectDetailPage() {
                 <li key={String(c.id)} className="border-b border-border/40 pb-2">
                   <p>{String(c.body ?? "")}</p>
                   <p className="text-xs text-muted-foreground">
-                    {c.user?.name ?? "User"} · {new Date(String(c.createdAt)).toLocaleString()}
+                    {c.user?.name ?? "User"} · {formatDateTime(c.createdAt)}
                   </p>
                 </li>
               ))}
@@ -343,8 +344,8 @@ export default function ProjectDetailPage() {
                 <li key={String(t.id)} className="border-b border-border/40 pb-2">
                   <div className="flex flex-wrap justify-between gap-2">
                     <span>
-                      {new Date(String(t.startTime)).toLocaleString()}
-                      {t.endTime ? ` – ${new Date(String(t.endTime)).toLocaleString()}` : ""}
+                      {formatDateTime(t.startTime)}
+                      {t.endTime ? ` – ${formatDateTime(t.endTime)}` : ""}
                     </span>
                     {t.durationMinutes != null ? (
                       <span className="text-muted-foreground">{Number(t.durationMinutes)} min</span>

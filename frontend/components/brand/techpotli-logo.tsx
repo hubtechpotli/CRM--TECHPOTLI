@@ -5,6 +5,7 @@ const sizes = {
   sm: { width: 120, height: 36, className: "h-8 w-auto" },
   md: { width: 160, height: 48, className: "h-10 w-auto" },
   lg: { width: 200, height: 60, className: "h-14 w-auto" },
+  xl: { width: 240, height: 72, className: "h-[4.5rem] w-auto" },
 } as const;
 
 export function TechPotliLogo({

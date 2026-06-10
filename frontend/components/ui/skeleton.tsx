@@ -34,12 +34,14 @@ export function CardSkeleton({ className }: { className?: string }) {
 
 export function KpiRowSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-2xl border border-border/60 bg-card p-5">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="mt-3 h-8 w-16" />
-          <Skeleton className="mt-4 h-12 rounded" />
+        <div key={i} className="flex animate-pulse items-center gap-2.5 rounded-xl border border-border/60 bg-card p-3">
+          <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-2 w-14" />
+            <Skeleton className="h-5 w-10" />
+          </div>
         </div>
       ))}
     </div>
@@ -48,20 +50,21 @@ export function KpiRowSkeleton({ count = 4 }: { count?: number }) {
 
 export function DashboardPageSkeleton() {
   return (
-    <div className="space-y-6">
-      <KpiRowSkeleton />
-      <CardSkeleton className="h-32" />
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <CardSkeleton className="h-64" />
-            <CardSkeleton className="h-64" />
+    <div className="space-y-3">
+      <Skeleton className="h-10 w-full rounded-xl" />
+      <KpiRowSkeleton count={6} />
+      <Skeleton className="h-14 w-full rounded-xl" />
+      <div className="grid gap-3 xl:grid-cols-12">
+        <div className="space-y-3 xl:col-span-8">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <CardSkeleton className="h-44" />
+            <CardSkeleton className="h-44" />
           </div>
-          <CardSkeleton className="h-72" />
+          <CardSkeleton className="h-56" />
         </div>
-        <div className="space-y-6">
-          <CardSkeleton className="h-80" />
-          <CardSkeleton className="h-48" />
+        <div className="space-y-3 xl:col-span-4">
+          <CardSkeleton className="h-52" />
+          <CardSkeleton className="h-40" />
         </div>
       </div>
     </div>
@@ -147,16 +150,15 @@ export function AppShellSkeleton() {
         className="flex shrink-0 flex-col border-r border-border bg-sidebar"
         style={{ width: "var(--sidebar-width)" }}
       >
-        <div className="border-b border-white/10 px-5 py-5">
-          <Skeleton className="h-8 w-32 bg-white/10" />
-          <Skeleton className="mt-2 h-3 w-20 bg-white/10" />
+        <div className="border-b border-border px-4 py-4">
+          <Skeleton className="h-10 w-28" />
         </div>
         <nav className="flex-1 space-y-5 p-3">
           {Array.from({ length: 4 }).map((_, g) => (
             <div key={g} className="space-y-2">
-              <Skeleton className="mx-2 h-3 w-16 bg-white/10" />
+              <Skeleton className="mx-2 h-3 w-16" />
               {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-9 w-full rounded-lg bg-white/10" />
+                <Skeleton key={i} className="h-9 w-full rounded-lg" />
               ))}
             </div>
           ))}

@@ -33,7 +33,7 @@ function formatMoney(value: number) {
 }
 
 const urgencyStyles: Record<NotifyTemplate["urgency"], string> = {
-  info: "bg-indigo-500/10 text-indigo-600",
+  info: "bg-muted text-foreground",
   warning: "bg-amber-500/10 text-amber-700",
   critical: "bg-red-500/10 text-red-600",
 };

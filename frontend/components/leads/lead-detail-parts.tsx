@@ -12,7 +12,7 @@ import {
   Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatLabel } from "@/lib/format";
+import { formatDate, formatDateTime, formatLabel } from "@/lib/format";
 import { isFollowUpOverdue } from "@/lib/lead-ui";
 import { LeadStatusBadge } from "@/components/leads/lead-badges";
 
@@ -117,7 +117,7 @@ export function ActivityTimeline({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-semibold">{formatLabel(type)}</span>
                 <span className="text-[11px] text-muted-foreground">
-                  {new Date(String(a.createdAt)).toLocaleString()}
+                  {formatDateTime(a.createdAt)}
                 </span>
               </div>
               {a.contactStatus ? (
@@ -166,7 +166,7 @@ export function StatusHistoryTimeline({
             {h.reason ? <span className="text-xs text-muted-foreground">({String(h.reason)})</span> : null}
             <span className="ml-auto text-[11px] text-muted-foreground">
               {h.changedBy?.name ? `${h.changedBy.name} · ` : ""}
-              {new Date(String(h.createdAt)).toLocaleString()}
+              {formatDateTime(h.createdAt)}
             </span>
           </li>
         );
@@ -203,7 +203,7 @@ export function QuickFacts({
         <InfoRow
           icon={Calendar}
           label="Follow-up"
-          value={`${new Date(String(followUpDate)).toLocaleDateString()}${overdue ? " · Overdue" : ""}`}
+          value={`${formatDate(followUpDate)}${overdue ? " · Overdue" : ""}`}
           highlight={overdue}
         />
       ) : null}

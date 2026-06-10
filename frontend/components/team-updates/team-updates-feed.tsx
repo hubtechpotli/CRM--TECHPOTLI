@@ -1,72 +1,47 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { appendListItem, createTempId, patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
-import {
-  Building2,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  ExternalLink,
-  Loader2,
-  MessageSquarePlus,
-  PlayCircle,
-} from "lucide-react";
+import { Filter, MessageSquarePlus, Search, SlidersHorizontal } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatDateTime, formatLabel } from "@/lib/format";
-import { type GlobalWorkItem, type TeamFeedResponse } from "@/lib/team-updates";
+import { formatDateTime } from "@/lib/format";
+import {
+  optimisticBumpTeamSummary,
+  type GlobalWorkItem,
+  type TeamFeedResponse,
+} from "@/lib/team-updates";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
-import { fetchCustomersDirectory } from "@/lib/customers-directory";
 import { useAssignees } from "@/hooks/use-users";
+import {
+  customerToOption,
+  useCustomerDirectorySearch,
+} from "@/hooks/use-customer-directory-search";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useAuthStore } from "@/store/auth-store";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { GlassCard } from "@/components/ui/glass-card";
-import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { SelectInput } from "@/components/ui/form-field";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { CustomerOption } from "@/components/ui/customer-search-field";
+import { FEATURE } from "@/lib/feature-colors";
+import type { ComposeFormState } from "@/components/team-updates/team-update-compose";
+import { PostUpdateModal, type PostSuccess } from "@/components/team-updates/post-update-modal";
+import { TeamUpdateCard } from "@/components/team-updates/team-update-card";
+import { MentionText } from "@/components/team-updates/mention-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
-
-const CATEGORIES = [
-  { value: "GENERAL", label: "General" },
-  { value: "DOMAIN", label: "Domain" },
-  { value: "HOSTING", label: "Hosting" },
-  { value: "PROJECT", label: "Project" },
-  { value: "PAYMENT", label: "Payment" },
-  { value: "DOCUMENT", label: "Document" },
-  { value: "OTHER", label: "Other" },
-];
+import { cn } from "@/lib/utils";
 
 const FILTER_TABS = [
-  { value: "open", label: "Open items" },
-  { value: "all", label: "All" },
-  { value: "OPEN", label: "Open" },
-  { value: "IN_PROGRESS", label: "In progress" },
-  { value: "mine", label: "Assigned to me" },
-  { value: "unassigned", label: "Unassigned" },
-];
-
-function statusStyles(status: string) {
-  switch (status) {
-    case "IN_PROGRESS":
-      return "bg-amber-500/10 text-amber-700 border-amber-500/25 dark:text-amber-300";
-    case "COMPLETED":
-      return "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 dark:text-emerald-300";
-    default:
-      return "bg-primary/10 text-primary border-primary/25";
-  }
-}
-
-function mutationError(err: unknown) {
-  return isAxiosError(err)
-    ? String((err.response?.data as { message?: string })?.message ?? "Action failed")
-    : "Action failed";
-}
+  { value: "open", label: "Open", color: FEATURE.open },
+  { value: "mine", label: "Mine", color: FEATURE.mine },
+  { value: "unassigned", label: "Unassigned", color: FEATURE.unassigned },
+  { value: "IN_PROGRESS", label: "In progress", color: FEATURE.inProgress },
+  { value: "all", label: "All", color: FEATURE.all },
+] as const;
 
 type CreateWorkItemPayload = {
   customerId: string;
@@ -78,7 +53,7 @@ type CreateWorkItemPayload = {
   dueDate?: string;
 };
 
-const emptyForm = {
+const emptyForm: ComposeFormState = {
   customerId: "",
   title: "",
   description: "",
@@ -87,6 +62,12 @@ const emptyForm = {
   projectId: "",
   dueDate: "",
 };
+
+function mutationError(err: unknown) {
+  return isAxiosError(err)
+    ? String((err.response?.data as { message?: string })?.message ?? "Action failed")
+    : "Action failed";
+}
 
 function teamInvalidateKeys(customerId?: string) {
   const keys: (readonly string[])[] = [["team-updates-feed"], ["team-updates-summary"]];
@@ -102,10 +83,12 @@ function WorkItemUpdatesThread({
   customerId,
   itemId,
   fallback,
+  mentionUsers,
 }: {
   customerId: string;
   itemId: string;
   fallback: GlobalWorkItem["updates"];
+  mentionUsers: Array<{ id: string; name: string }>;
 }) {
   const { data: loaded } = useQuery({
     queryKey: ["work-item-updates", customerId, itemId],
@@ -125,15 +108,17 @@ function WorkItemUpdatesThread({
       {updates.map((u) => {
         const authorName = (u.author as { name?: string })?.name ?? "Team member";
         return (
-          <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
+          <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <UserAvatar name={authorName} size="sm" />
-                <span className="text-xs font-semibold text-foreground">{authorName}</span>
+                <span className="text-[10px] font-semibold">{authorName}</span>
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</span>
+              <span className="text-[10px] text-muted-foreground">{formatDateTime(u.createdAt)}</span>
             </div>
-            <p className="mt-2 whitespace-pre-wrap">{String(u.body)}</p>
+            <p className="mt-1.5 whitespace-pre-wrap text-xs">
+              <MentionText text={String(u.body)} users={mentionUsers} />
+            </p>
           </div>
         );
       })}
@@ -141,34 +126,72 @@ function WorkItemUpdatesThread({
   );
 }
 
-export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; take?: number }) {
+export type TeamUpdatesFeedProps = {
+  compact?: boolean;
+  take?: number;
+  statusFilter?: string;
+  onStatusFilterChange?: (value: string) => void;
+  dateRange?: "" | "today" | "7d" | "30d";
+  onDateRangeChange?: (value: "" | "today" | "7d" | "30d") => void;
+};
+
+export function TeamUpdatesFeed({
+  compact = false,
+  take,
+  statusFilter: controlledStatus,
+  onStatusFilterChange,
+  dateRange: controlledDateRange,
+  onDateRangeChange,
+}: TeamUpdatesFeedProps) {
   const queryClient = useQueryClient();
   const { authReady } = useAuthReady();
+  const currentUser = useAuthStore((s) => s.user);
   const { data: assignees = [] } = useAssignees();
+  const mentionUsers = assignees.map((a) => ({ id: a.id, name: a.name }));
 
-  const [statusFilter, setStatusFilter] = useState("open");
+  const [internalStatus, setInternalStatus] = useState("open");
+  const [internalDateRange, setInternalDateRange] = useState<"" | "today" | "7d" | "30d">("");
+  const statusFilter = controlledStatus ?? internalStatus;
+  const setStatusFilter = onStatusFilterChange ?? setInternalStatus;
+  const dateRange = controlledDateRange ?? internalDateRange;
+  const setDateRange = onDateRangeChange ?? setInternalDateRange;
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [dateRange, setDateRange] = useState<"" | "today" | "7d" | "30d">("");
   const [filterEmployee, setFilterEmployee] = useState("");
   const [filterCustomer, setFilterCustomer] = useState("");
   const [filterProject, setFilterProject] = useState("");
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [showForm, setShowForm] = useState(false);
+  const [filterCustomerSearch, setFilterCustomerSearch] = useState("");
+  const [pinnedCustomer, setPinnedCustomer] = useState<{
+    value: string;
+    label: string;
+    sublabel?: string;
+  } | null>(null);
+  const [pinnedFilterCustomer, setPinnedFilterCustomer] = useState<{
+    value: string;
+    label: string;
+    sublabel?: string;
+  } | null>(null);
+
+  const [showModal, setShowModal] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [postSuccess, setPostSuccess] = useState<PostSuccess | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [updateText, setUpdateText] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState<ComposeFormState>(emptyForm);
 
-  const [form, setForm] = useState({
-    customerId: "",
-    title: "",
-    description: "",
-    category: "GENERAL",
-    assignedToId: "",
-    projectId: "",
-    dueDate: "",
-  });
+  const activeFilterCount = [dateRange, filterEmployee, filterCustomer, filterProject].filter(Boolean).length;
+
+  function closePostModal() {
+    setShowModal(false);
+    setPostSuccess(null);
+    setForm(emptyForm);
+    setFormError(null);
+    setPinnedCustomer(null);
+  }
 
   const dateParams = (() => {
     if (!dateRange) return {};
@@ -213,7 +236,19 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     return p;
   })();
 
-  const queryKey = ["team-updates-feed", statusFilter, page, pageSize, debouncedSearch, dateRange, filterEmployee, filterCustomer, filterProject, take, compact];
+  const queryKey = [
+    "team-updates-feed",
+    statusFilter,
+    page,
+    pageSize,
+    debouncedSearch,
+    dateRange,
+    filterEmployee,
+    filterCustomer,
+    filterProject,
+    take,
+    compact,
+  ];
 
   const { data: feedPage, isLoading } = useQuery({
     queryKey,
@@ -222,18 +257,31 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       return normalizePaginated<GlobalWorkItem>(res.data);
     },
     enabled: authReady,
+    staleTime: 30_000,
   });
 
   const items = feedPage?.data ?? [];
 
-  const { data: filterCustomers = [] } = useQuery({
-    queryKey: ["customers-directory-filter"],
-    queryFn: async () => {
-      const data = await fetchCustomersDirectory<{ id: string; companyName?: string }>({ limit: 100 });
-      return data.items;
-    },
-    enabled: authReady && !compact,
-  });
+  const {
+    data: filterSearchData,
+    isLoading: filterCustomersLoading,
+    minChars: filterMinChars,
+  } = useCustomerDirectorySearch(filterCustomerSearch, authReady && !compact && filtersOpen);
+
+  const filterCustomerOptions = useMemo(() => {
+    const items = filterSearchData?.items ?? [];
+    const opts: CustomerOption[] = items.map(customerToOption);
+    const pin =
+      pinnedFilterCustomer?.value === filterCustomer
+        ? pinnedFilterCustomer
+        : filterCustomer
+          ? opts.find((o) => o.value === filterCustomer)
+          : null;
+    if (pin && !opts.some((o) => o.value === pin.value)) {
+      opts.unshift(pin);
+    }
+    return opts;
+  }, [filterSearchData?.items, filterCustomer, pinnedFilterCustomer]);
 
   const { data: filterProjects = [] } = useQuery({
     queryKey: ["projects-filter", filterCustomer],
@@ -246,24 +294,16 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     enabled: authReady && !compact,
   });
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ["customers-directory-quick"],
-    queryFn: async () => {
-      const data = await fetchCustomersDirectory<{ id: string; companyName?: string }>({ limit: 100 });
-      return data.items;
-    },
-    enabled: authReady && showForm && !compact,
-  });
-
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<Array<{ id: string; name?: string }>>({
     queryKey: ["customer-projects", form.customerId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Array<{ id: string; name?: string }>> => {
       const res = await api.get<Array<{ id: string; name?: string }>>("/projects", {
-        params: { customerId: form.customerId },
+        params: { customerId: form.customerId, limit: 100 },
       });
-      return Array.isArray(res.data) ? res.data : [];
+      if (Array.isArray(res.data)) return res.data;
+      return (normalizePaginated(res.data).data ?? []) as Array<{ id: string; name?: string }>;
     },
-    enabled: showForm && !compact && Boolean(form.customerId),
+    enabled: !compact && Boolean(form.customerId),
   });
 
   const createMutation = useOptimisticMutation({
@@ -281,20 +321,60 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     snapshotKeys: [queryKey],
     invalidateKeys: (payload) => teamInvalidateKeys(payload.customerId),
     onMutate: (payload) => {
+      const assignee = assignees.find((a) => a.id === payload.assignedToId);
+      const customerName =
+        pinnedCustomer?.value === payload.customerId ? pinnedCustomer.label : "Customer";
+
       appendListItem(queryClient, queryKey, {
         id: createTempId(),
         title: payload.title,
+        description: payload.description,
         status: "OPEN",
         category: payload.category,
         customerId: payload.customerId,
-        customer: { id: payload.customerId },
+        customer: {
+          id: payload.customerId,
+          companyName: customerName,
+        },
+        assignedTo: assignee ? { id: assignee.id, name: assignee.name } : undefined,
+        createdBy: currentUser ? { id: currentUser.id, name: currentUser.name } : undefined,
         createdAt: new Date().toISOString(),
       });
-      setShowForm(false);
-      setFormError(null);
+
+      optimisticBumpTeamSummary(queryClient, {
+        assignedToId: payload.assignedToId,
+        currentUserId: currentUser?.id,
+      });
+
+      setPostSuccess({
+        title: payload.title,
+        customerName,
+        assigneeName: assignee?.name,
+        broadcastTeam: !payload.assignedToId,
+      });
       setForm(emptyForm);
+      setFormError(null);
+
+      if (assignee) {
+        toast.success(`${assignee.name} notified — they can start work.`);
+      } else {
+        toast.success("Posted — whole team notified.");
+      }
     },
-    onError: (err) => setFormError(mutationError(err)),
+    onError: (err, payload) => {
+      setPostSuccess(null);
+      setShowModal(true);
+      setForm({
+        customerId: payload.customerId,
+        title: payload.title,
+        description: payload.description ?? "",
+        category: payload.category,
+        assignedToId: payload.assignedToId ?? "",
+        projectId: payload.projectId ?? "",
+        dueDate: payload.dueDate ?? "",
+      });
+      setFormError(mutationError(err));
+    },
   });
 
   const statusMutation = useOptimisticMutation({
@@ -331,13 +411,6 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     },
   });
 
-  const canManage = (item: GlobalWorkItem) => {
-    const s = String(item.status ?? "OPEN");
-    return s !== "COMPLETED" && s !== "CANCELLED";
-  };
-
-  const displayItems = items;
-
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -363,7 +436,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
   function mutateStatus(item: GlobalWorkItem, status: string, note?: string) {
     const customerId = resolveCustomerId(item);
     if (!customerId) {
-      toast.error("Missing customer for this work item. Refresh the page.");
+      setFormError("Missing customer for this work item. Refresh the page.");
       return;
     }
     statusMutation.mutate({ customerId, itemId: item.id, status, note });
@@ -371,319 +444,248 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
 
   function mutateUpdate(item: GlobalWorkItem, body: string) {
     const customerId = resolveCustomerId(item);
-    if (!customerId) {
-      toast.error("Missing customer for this work item. Refresh the page.");
-      return;
-    }
+    if (!customerId) return;
     updateMutation.mutate({ customerId, itemId: item.id, body });
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {!compact ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              All team updates across customers and projects — nothing gets missed.
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-1">
+              {FILTER_TABS.map((tab) => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(tab.value);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-[10px] font-semibold transition",
+                    statusFilter === tab.value
+                      ? cn(tab.color.solid, "text-white shadow-sm")
+                      : cn(tab.color.light, tab.color.text, "hover:brightness-95"),
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative ml-auto w-full max-w-[200px] sm:w-44">
+              <Search className="pointer-events-none absolute left-2 top-1/2 z-10 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search…"
+                className="w-full rounded-md border border-border bg-background py-1.5 pl-7 pr-2 text-xs outline-none focus:border-primary"
+              />
+            </div>
+
             <button
               type="button"
-              onClick={() => setShowForm((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-[10px] font-semibold transition",
+                filtersOpen || activeFilterCount > 0
+                  ? "border-primary/40 bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground hover:bg-muted",
+              )}
             >
-              <MessageSquarePlus className="h-3.5 w-3.5" />
-              {showForm ? "Cancel" : "Post update"}
+              <SlidersHorizontal className="h-3 w-3" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="crm-btn-violet !px-2.5 !py-1.5 !text-[10px]"
+            >
+              <MessageSquarePlus className="h-3 w-3" />
+              Post update
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <TextInput
-              value={search}
-              onChange={(v) => {
-                setSearch(v);
-                setPage(1);
-              }}
-              placeholder="Search company, poster, project…"
-            />
-            <SelectInput
-              value={dateRange}
-              onChange={(v) => {
-                setDateRange(v as typeof dateRange);
-                setPage(1);
-              }}
-              placeholder="Any time"
-              options={[
-                { value: "", label: "Any time" },
-                { value: "today", label: "Today" },
-                { value: "7d", label: "Last 7 days" },
-                { value: "30d", label: "Last 30 days" },
-              ]}
-            />
-            <SelectInput
-              value={filterEmployee}
-              onChange={(v) => {
-                setFilterEmployee(v);
-                setPage(1);
-              }}
-              placeholder="Posted by"
-              options={[{ value: "", label: "Anyone" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]}
-            />
-            <SelectInput
-              value={filterCustomer}
-              onChange={(v) => {
-                setFilterCustomer(v);
-                setFilterProject("");
-                setPage(1);
-              }}
-              placeholder="Customer"
-              options={[
-                { value: "", label: "All customers" },
-                ...filterCustomers.map((c) => ({ value: c.id, label: String(c.companyName ?? c.id) })),
-              ]}
-            />
-            <SelectInput
-              value={filterProject}
-              onChange={(v) => {
-                setFilterProject(v);
-                setPage(1);
-              }}
-              placeholder="Project"
-              options={[
-                { value: "", label: "All projects" },
-                ...filterProjects.map((p) => ({ value: p.id, label: String(p.name ?? p.id) })),
-              ]}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-1">
-            {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => {
-                  setStatusFilter(tab.value);
+          {filtersOpen ? (
+            <div className="grid gap-2 rounded-lg border border-border/50 bg-muted/20 p-2 sm:grid-cols-2 lg:grid-cols-4">
+              <SelectInput
+                value={dateRange}
+                onChange={(v) => {
+                  setDateRange(v as typeof dateRange);
                   setPage(1);
                 }}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                  statusFilter === tab.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {showForm ? (
-            <GlassCard>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <FormField label="Customer">
-                  <SelectInput
-                    value={form.customerId}
-                    onChange={(v) => setForm((f) => ({ ...f, customerId: v, projectId: "" }))}
-                    placeholder="Select customer"
-                    options={customers.map((c) => ({ value: c.id, label: c.companyName ?? c.id }))}
-                  />
-                </FormField>
-                <FormField label="Title">
-                  <TextInput
-                    value={form.title}
-                    onChange={(v) => setForm((f) => ({ ...f, title: v }))}
-                    placeholder="e.g. Purchase domain, Logo change"
-                    required
-                  />
-                </FormField>
-                <FormField label="Details">
-                  <TextArea
-                    value={form.description}
-                    onChange={(v) => setForm((f) => ({ ...f, description: v }))}
-                    rows={3}
-                  />
-                </FormField>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField label="Category">
-                    <SelectInput
-                      value={form.category}
-                      onChange={(v) => setForm((f) => ({ ...f, category: v }))}
-                      options={CATEGORIES}
-                    />
-                  </FormField>
-                  <FormField label="Assign to">
-                    <SelectInput
-                      value={form.assignedToId}
-                      onChange={(v) => setForm((f) => ({ ...f, assignedToId: v }))}
-                      placeholder="Anyone on the team"
-                      options={assignees.map((a) => ({ value: a.id, label: a.name }))}
-                    />
-                  </FormField>
-                  <FormField label="Link project">
-                    <SelectInput
-                      value={form.projectId}
-                      onChange={(v) => setForm((f) => ({ ...f, projectId: v }))}
-                      placeholder="Optional"
-                      options={projects.map((p) => ({ value: p.id, label: p.name ?? p.id }))}
-                    />
-                  </FormField>
-                  <FormField label="Due date">
-                    <TextInput type="date" value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
-                  </FormField>
-                </div>
-                {formError ? <p className="text-sm text-red-500">{formError}</p> : null}
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-                  >
-                    {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    Post to team
-                  </button>
-                </div>
-              </form>
-            </GlassCard>
+                placeholder="Any time"
+                options={[
+                  { value: "", label: "Any time" },
+                  { value: "today", label: "Today" },
+                  { value: "7d", label: "Last 7 days" },
+                  { value: "30d", label: "Last 30 days" },
+                ]}
+              />
+              <SelectInput
+                value={filterEmployee}
+                onChange={(v) => {
+                  setFilterEmployee(v);
+                  setPage(1);
+                }}
+                placeholder="Posted by"
+                options={[{ value: "", label: "Anyone" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]}
+              />
+              <SearchableSelect
+                value={filterCustomer}
+                selectedOption={pinnedFilterCustomer}
+                onOptionSelect={(opt) => {
+                  setPinnedFilterCustomer(opt);
+                  setFilterCustomer(opt.value);
+                  setFilterProject("");
+                  setPage(1);
+                }}
+                onChange={(v) => {
+                  if (!v) {
+                    setPinnedFilterCustomer(null);
+                    setFilterCustomer("");
+                    setFilterProject("");
+                    setPage(1);
+                  }
+                }}
+                options={filterCustomerOptions}
+                onSearchChange={setFilterCustomerSearch}
+                loading={filterCustomersLoading}
+                minSearchLength={filterMinChars}
+                placeholder="Filter by customer"
+                searchHint="Type 2+ chars to search customers"
+                emptyLabel="No match"
+              />
+              <SelectInput
+                value={filterProject}
+                onChange={(v) => {
+                  setFilterProject(v);
+                  setPage(1);
+                }}
+                placeholder="Project"
+                options={[
+                  { value: "", label: "All projects" },
+                  ...filterProjects.map((p) => ({ value: p.id, label: String(p.name ?? p.id) })),
+                ]}
+              />
+              {activeFilterCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateRange("");
+                    setFilterEmployee("");
+                    setFilterCustomer("");
+                    setFilterProject("");
+                    setPinnedFilterCustomer(null);
+                    setFilterCustomerSearch("");
+                    setPage(1);
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline sm:col-span-2 lg:col-span-4"
+                >
+                  <Filter className="h-3 w-3" />
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
           ) : null}
+
+          <PostUpdateModal
+            open={showModal}
+            onOpenChange={(v) => (v ? setShowModal(true) : closePostModal())}
+            form={form}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            onSubmit={handleSubmit}
+            error={formError}
+            pending={createMutation.isPending}
+            success={postSuccess}
+            onDone={closePostModal}
+            assignees={assignees}
+            onCustomerSelect={(opt) => setPinnedCustomer(opt)}
+            selectedCustomerOption={pinnedCustomer}
+            customerSearchEnabled={authReady && !compact && showModal}
+            projectOptions={projects.map((p) => ({ value: p.id, label: String(p.name ?? p.id) }))}
+          />
         </>
       ) : null}
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading team updates…</p>
-      ) : displayItems.length === 0 ? (
-        <GlassCard>
-          <p className="text-sm font-medium">No team updates</p>
-          <p className="mt-1 text-xs text-muted-foreground">Post an update so the whole team can see it.</p>
-        </GlassCard>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl border border-border/40 bg-muted/30" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div
+          className={cn(
+            "rounded-xl border border-dashed px-6 py-10 text-center",
+            FEATURE.teamUpdates.border,
+            FEATURE.teamUpdates.light,
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg text-white shadow-sm",
+              FEATURE.teamUpdates.solid,
+            )}
+          >
+            <MessageSquarePlus className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium">No team updates yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">Post an update so your team stays in sync.</p>
+          {!compact ? (
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="crm-btn-violet mt-3 !px-3 !py-1.5 !text-xs"
+            >
+              Post first update
+            </button>
+          ) : null}
+        </div>
       ) : (
-        <div className="space-y-3">
-          {displayItems.map((item) => {
-            const isOpen = expanded[item.id] ?? false;
-            const updateCount = (item as GlobalWorkItem & { _count?: { updates: number } })._count?.updates ?? (item.updates ?? []).length;
-            const updates = item.updates ?? [];
-            const status = String(item.status ?? "OPEN");
-            const manage = canManage(item);
+        <div className="space-y-2">
+          {items.map((item) => {
             const customerId = resolveCustomerId(item);
+            const isOpen = expanded[item.id] ?? false;
+            const updates = item.updates ?? [];
 
             return (
-              <GlassCard key={item.id}>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Link
-                    href={`/customers/${customerId}?tab=teamWork`}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/15"
-                  >
-                    <Building2 className="h-3.5 w-3.5" />
-                    {item.customer?.companyName ?? "Customer"}
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                  {item.project?.name ? (
-                    <Link
-                      href={`/projects/${item.project.id}`}
-                      className="text-xs text-muted-foreground hover:text-primary hover:underline"
-                    >
-                      Project: {item.project.name}
-                    </Link>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", statusStyles(status))}>
-                        {formatLabel(status)}
-                      </span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {formatLabel(String(item.category ?? "GENERAL"))}
-                      </span>
-                    </div>
-                    <h4 className="mt-2 font-semibold">{item.title}</h4>
-                    {item.description ? (
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.description}</p>
-                    ) : null}
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    <p>{formatDateTime(item.createdAt)}</p>
-                    {item.dueDate ? (
-                      <p className="mt-1 flex items-center justify-end gap-1">
-                        <Clock className="h-3 w-3" />
-                        Due {formatDateTime(item.dueDate)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <UserAvatar name={item.createdBy?.name ?? "?"} size="sm" />
-                    <span>{item.createdBy?.name ?? "—"}</span>
-                  </div>
-                  {item.assignedTo?.name ? (
-                    <div className="flex items-center gap-1.5">
-                      <UserAvatar name={item.assignedTo.name} size="sm" />
-                      <span>→ {item.assignedTo.name}</span>
-                    </div>
-                  ) : (
-                    <span className="text-primary">Visible to all team</span>
-                  )}
-                </div>
-
-                {!compact && manage && status !== "COMPLETED" && status !== "CANCELLED" ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {status === "OPEN" ? (
-                      <button
-                        type="button"
-                        onClick={() => mutateStatus(item, "IN_PROGRESS", "Started working on this")}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted/50"
-                      >
-                        <PlayCircle className="h-3.5 w-3.5" />
-                        Start work
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => mutateStatus(item, "COMPLETED", "Marked as completed")}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Complete
-                    </button>
-                  </div>
-                ) : null}
-
-                {!compact && updateCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setExpanded((e) => ({ ...e, [item.id]: !isOpen }))}
-                    className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                    {updateCount} update{updateCount === 1 ? "" : "s"}
-                  </button>
-                ) : null}
-
-                {!compact && isOpen ? (
-                  <WorkItemUpdatesThread customerId={customerId} itemId={item.id} fallback={updates} />
-                ) : null}
-
-                {!compact && manage ? (
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      type="text"
-                      value={updateText[item.id] ?? ""}
-                      onChange={(e) => setUpdateText((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                      placeholder="Add progress note…"
-                      className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
+              <TeamUpdateCard
+                key={item.id}
+                item={item}
+                customerId={customerId}
+                currentUserId={currentUser?.id}
+                mentionUsers={mentionUsers}
+                expanded={isOpen}
+                onToggleExpand={() => setExpanded((e) => ({ ...e, [item.id]: !isOpen }))}
+                updateText={updateText[item.id] ?? ""}
+                onUpdateTextChange={(v) => setUpdateText((prev) => ({ ...prev, [item.id]: v }))}
+                onStart={() => mutateStatus(item, "IN_PROGRESS", "Started working on this")}
+                onComplete={() => mutateStatus(item, "COMPLETED", "Marked as completed")}
+                onAddUpdate={() => mutateUpdate(item, updateText[item.id] ?? "")}
+                updatePending={updateMutation.isPending}
+                statusPending={statusMutation.isPending}
+                updatesSlot={
+                  !compact && isOpen ? (
+                    <WorkItemUpdatesThread
+                      customerId={customerId}
+                      itemId={item.id}
+                      fallback={updates}
+                      mentionUsers={mentionUsers}
                     />
-                    <button
-                      type="button"
-                      disabled={!updateText[item.id]?.trim() || updateMutation.isPending}
-                      onClick={() => mutateUpdate(item, updateText[item.id] ?? "")}
-                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                    >
-                      Add
-                    </button>
-                  </div>
-                ) : null}
-              </GlassCard>
+                  ) : null
+                }
+              />
             );
           })}
         </div>

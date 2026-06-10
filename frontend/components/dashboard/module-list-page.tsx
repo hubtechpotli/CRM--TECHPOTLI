@@ -1,9 +1,11 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { getRouteColor } from "@/lib/nav-colors";
 import { api } from "@/lib/api";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { SectionCard } from "@/components/dashboard/section-card";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { DataColumn, DataTable } from "@/components/dashboard/data-table";
 
 type PaginatedResponse<T> = {
@@ -46,9 +48,13 @@ export function ModuleListPage<T extends Record<string, unknown>>({
   listHeader,
   limit = 50,
 }: ModuleListPageProps<T>) {
+  const pathname = usePathname();
+  const routeColor = getRouteColor(pathname);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [queryKey, params, paginated ? page : null],
     enabled,
+    staleTime: 30_000,
     queryFn: async () => {
       const res = await api.get<T[] | PaginatedResponse<T>>(endpoint, {
         params: paginated ? { ...params, page, limit } : params,
@@ -69,11 +75,10 @@ export function ModuleListPage<T extends Record<string, unknown>>({
   const end = paginated ? Math.min(page * limit, total) : rows.length;
 
   return (
-    <div className="space-y-6">
-      {!hideHeader ? <PageHeader title={title} description={description} /> : null}
-      <GlassCard className="overflow-hidden p-0">
+    <CrmPageShell title={title} description={description} hideHeader={hideHeader}>
+      <SectionCard noPadding accent={routeColor}>
         {listHeader ? (
-          <div className="border-b border-border/60 px-4 py-3">{listHeader}</div>
+          <div className="border-b border-border/60 px-4 py-2.5">{listHeader}</div>
         ) : null}
         <div className="p-4">
           {error ? (
@@ -127,7 +132,7 @@ export function ModuleListPage<T extends Record<string, unknown>>({
             </>
           )}
         </div>
-      </GlassCard>
-    </div>
+      </SectionCard>
+    </CrmPageShell>
   );
 }

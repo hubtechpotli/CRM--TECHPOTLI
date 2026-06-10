@@ -33,7 +33,7 @@ import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
 import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { Trash2 } from "lucide-react";
-import { formatLabel } from "@/lib/format";
+import { formatDate, formatLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   CompanyAvatar,
@@ -269,9 +269,8 @@ export default function LeadDetailPage() {
     <div className="space-y-6">
       <DetailBackLink />
 
-      <GlassCard className="relative overflow-hidden">
-        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-indigo-500/20 to-violet-600/10" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
+      <GlassCard className="overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-4 p-5">
           <div className="flex items-start gap-4">
             <CompanyAvatar name={String(data.companyName ?? "?")} className="h-14 w-14 text-lg" />
             <div>
@@ -511,7 +510,7 @@ export default function LeadDetailPage() {
                   </div>
                   <p className="mt-2 text-lg font-bold">₹{String(q.grandTotal ?? 0)}</p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Valid until {q.validUntil ? new Date(String(q.validUntil)).toLocaleDateString() : "—"}
+                    Valid until {q.validUntil ? formatDate(q.validUntil) : "—"}
                   </p>
                 </div>
               ))}

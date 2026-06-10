@@ -4,10 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ModuleListPage } from "@/components/dashboard/module-list-page";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { Modal } from "@/components/ui/modal";
 import { QuotationForm } from "@/components/quotations/quotation-form";
 import { isTempId } from "@/lib/optimistic-mutation";
+import { formatDate } from "@/lib/format";
+import { useRouteColor } from "@/hooks/use-route-color";
 
 type QuotationRow = Record<string, unknown>;
 
@@ -16,24 +18,20 @@ function formatLabel(value: string) {
 }
 
 export default function QuotationsPage() {
+  const routeColor = useRouteColor();
   const router = useRouter();
   const [showNew, setShowNew] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Quotations"
-        description="Sales quotations sent to prospects and customers."
-        action={
-          <button
-            type="button"
-            onClick={() => setShowNew(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            + New quotation
-          </button>
-        }
-      />
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+          + New quotation
+        </button>
+      }
+    >
       <ModuleListPage<QuotationRow>
         title=""
         hideHeader
@@ -67,11 +65,11 @@ export default function QuotationsPage() {
             key: "validUntil",
             label: "Valid until",
             render: (row) =>
-              row.validUntil ? new Date(String(row.validUntil)).toLocaleDateString() : "—",
+              row.validUntil ? formatDate(row.validUntil) : "—",
           },
         ]}
       />
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="New quotation" size="lg">
+      <Modal open={showNew} onOpenChange={setShowNew} title="New quotation" description="Send a quote to your client" size="lg" accent="cyan">
         <QuotationForm
           onCancel={() => setShowNew(false)}
           onSuccess={(data) => {
@@ -81,6 +79,6 @@ export default function QuotationsPage() {
           }}
         />
       </Modal>
-    </div>
+    </CrmPageShell>
   );
 }

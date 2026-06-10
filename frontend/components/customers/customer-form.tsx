@@ -12,7 +12,10 @@ import {
 } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { Building2, Globe, Share2 } from "lucide-react";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { FormFooterActions, FormShell } from "@/components/ui/form-shell";
+import { FormSection } from "@/components/ui/form-section";
 import { useAssignees } from "@/hooks/use-users";
 
 type CustomerFormData = {
@@ -203,24 +206,30 @@ export function CustomerForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col">
+    <form onSubmit={handleSubmit}>
+      <FormShell
+        footer={
+          <FormFooterActions
+            onCancel={onCancel}
+            submitLabel={isEdit ? "Update customer" : "Create customer"}
+            pending={mutation.isPending}
+          />
+        }
+      >
       {!isEdit && restored ? (
-        <div className="mb-4 flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm">
-          <span className="text-muted-foreground">Draft restored</span>
-          <button type="button" onClick={discardDraft} className="text-primary hover:underline">
+        <div className="flex items-center justify-between rounded-xl border border-emerald-200/60 bg-emerald-50/80 px-3 py-2 text-sm">
+          <span className="text-emerald-900/80">Draft restored</span>
+          <button type="button" onClick={discardDraft} className="font-medium text-emerald-700 hover:underline">
             Discard draft
           </button>
         </div>
       ) : null}
       {error ? (
-        <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : null}
 
-      <div className="space-y-6">
-        <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Company & contact
-          </h3>
+      <div className="space-y-4">
+        <FormSection title="Company & contact" description="Primary business details" icon={Building2} accent="indigo">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Company name">
               <TextInput value={form.companyName} onChange={(v) => set("companyName", v)} required />
@@ -246,12 +255,9 @@ export function CustomerForm({
               />
             </FormField>
           </div>
-        </section>
+        </FormSection>
 
-        <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Address & business
-          </h3>
+        <FormSection title="Address & business" accent="amber">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Address" className="sm:col-span-2">
               <TextArea value={form.address} onChange={(v) => set("address", v)} rows={2} />
@@ -269,12 +275,9 @@ export function CustomerForm({
               <TextInput value={form.natureOfBusiness} onChange={(v) => set("natureOfBusiness", v)} />
             </FormField>
           </div>
-        </section>
+        </FormSection>
 
-        <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Web & hosting
-          </h3>
+        <FormSection title="Web & hosting" icon={Globe} accent="cyan">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Domain">
               <TextInput value={form.domain} onChange={(v) => set("domain", v)} />
@@ -282,7 +285,7 @@ export function CustomerForm({
             <FormField label="Hosting">
               <TextInput value={form.hosting} onChange={(v) => set("hosting", v)} />
             </FormField>
-            <FormField label="Vercal link">
+            <FormField label="Vercel link">
               <TextInput value={form.vercalLink} onChange={(v) => set("vercalLink", v)} type="url" />
             </FormField>
             <FormField label="Live website">
@@ -292,12 +295,9 @@ export function CustomerForm({
               <TextInput value={form.referenceWebsiteLink} onChange={(v) => set("referenceWebsiteLink", v)} type="url" />
             </FormField>
           </div>
-        </section>
+        </FormSection>
 
-        <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Social & notes
-          </h3>
+        <FormSection title="Social & notes" icon={Share2} accent="rose">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Facebook URL">
               <TextInput value={form.facebookUrl} onChange={(v) => set("facebookUrl", v)} type="url" />
@@ -312,27 +312,9 @@ export function CustomerForm({
               <TextArea value={form.remarks} onChange={(v) => set("remarks", v)} rows={3} />
             </FormField>
           </div>
-        </section>
+        </FormSection>
       </div>
-
-      <div className="sticky bottom-0 -mx-5 mt-4 flex justify-end gap-2 border-t border-border/50 bg-white/95 px-5 py-4 dark:bg-slate-900/95">
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
-          >
-            Cancel
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-indigo-600 disabled:opacity-60"
-        >
-          {mutation.isPending ? "Saving…" : isEdit ? "Update customer" : "Create customer"}
-        </button>
-      </div>
+      </FormShell>
     </form>
   );
 }

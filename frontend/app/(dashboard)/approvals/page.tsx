@@ -7,17 +7,21 @@ import { removeListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel } from "@/lib/format";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
+import { SectionCard } from "@/components/dashboard/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CheckSquare } from "lucide-react";
 import { DataTable } from "@/components/dashboard/data-table";
 import { ListActionButton } from "@/components/dashboard/list-actions";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
+import { useRouteColor } from "@/hooks/use-route-color";
 
 type ApprovalRow = Record<string, unknown> & {
   requestedBy?: { name?: string };
 };
 
 export default function ApprovalsPage() {
+  const routeColor = useRouteColor();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -27,6 +31,7 @@ export default function ApprovalsPage() {
       const res = await api.get<ApprovalRow[]>("/approvals/pending");
       return res.data;
     },
+    staleTime: 30_000,
   });
 
   const actionMutation = useOptimisticMutation({
@@ -57,12 +62,11 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Approvals" description="Pending approval requests for admin review." />
+    <CrmPageShell hideHeader title="">
       {actionError ? (
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600">{actionError}</p>
       ) : null}
-      <GlassCard>
+      <SectionCard noPadding accent={routeColor} className="p-4">
         {isLoading ? (
           <ListPageSkeleton rows={5} columns={4} />
         ) : error ? (
@@ -75,6 +79,13 @@ export default function ApprovalsPage() {
         ) : (
           <DataTable
             rows={rows}
+            emptyState={
+              <EmptyState
+                icon={CheckSquare}
+                title="All caught up"
+                description="No pending approvals right now."
+              />
+            }
             columns={[
               {
                 key: "type",
@@ -125,7 +136,7 @@ export default function ApprovalsPage() {
             ]}
           />
         )}
-      </GlassCard>
-    </div>
+      </SectionCard>
+    </CrmPageShell>
   );
 }

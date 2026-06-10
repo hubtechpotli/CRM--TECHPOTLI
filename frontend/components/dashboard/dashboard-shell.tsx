@@ -20,11 +20,19 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
 import { TeamUpdateToast } from "@/components/team-update-toast";
+import { SectionHero } from "@/components/dashboard/section-hero";
 import { api } from "@/lib/api";
 import type { TeamUpdatesSummary } from "@/lib/team-updates";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { BOTTOM_NAV_ITEMS, NAV_GROUPS, PAGE_CTAS, roleLabel } from "@/lib/shell-nav-groups";
+import { NAV_GROUPS, PAGE_CTAS, roleLabel } from "@/lib/shell-nav-groups";
+import { resolvePageMeta } from "@/lib/page-meta";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+import {
+  getPageIcon,
+  getRouteColor,
+  shouldShowSectionHero,
+} from "@/lib/nav-colors";
 
 function getPageCta(pathname: string) {
   if (PAGE_CTAS[pathname]) return PAGE_CTAS[pathname];
@@ -34,9 +42,22 @@ function getPageCta(pathname: string) {
   return match ? PAGE_CTAS[match] : PAGE_CTAS["/dashboard"];
 }
 
-const PREFETCH_ROUTES = ["/dashboard", "/customers", "/leads", "/projects", "/reports"];
+const PREFETCH_ROUTES = [
+  "/dashboard",
+  "/customers",
+  "/leads",
+  "/projects",
+  "/invoices",
+  "/payments",
+  "/quotations",
+  "/employees",
+  "/reports",
+  "/team-updates",
+  "/renewals",
+  "/support",
+];
 
-function RouteProgress() {
+function RouteProgress({ color }: { color: string }) {
   const pathname = usePathname();
   const [progress, setProgress] = useState(0);
 
@@ -54,10 +75,10 @@ function RouteProgress() {
 
   if (progress === 0) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 bg-primary/15">
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 bg-black/5">
       <div
-        className="h-full bg-primary transition-all duration-200 ease-out"
-        style={{ width: `${progress}%` }}
+        className="h-full transition-all duration-200 ease-out"
+        style={{ width: `${progress}%`, backgroundColor: color }}
       />
     </div>
   );
@@ -70,8 +91,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const isDashboard = pathname === "/dashboard";
+  const pageMeta = resolvePageMeta(pathname);
   const cta = getPageCta(pathname);
+  const routeColor = getRouteColor(pathname);
+  const PageIcon = getPageIcon(pathname);
+  const showHero = shouldShowSectionHero(pathname);
 
   function prefetchRoute(href: string) {
     if (!PREFETCH_ROUTES.includes(href)) return;
@@ -84,17 +108,49 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       });
     }
     if (href === "/customers") {
+      const customerParams = {
+        q: undefined,
+        status: undefined,
+        assignedEmployeeId: undefined,
+        page: 1,
+        limit: DEFAULT_PAGE_SIZE,
+      };
       queryClient.prefetchQuery({
-        queryKey: ["customers-directory", { page: 1, limit: 50 }],
-        queryFn: async () => (await import("@/lib/customers-directory")).fetchCustomersDirectory({ page: 1, limit: 50 }),
+        queryKey: ["customers-directory", customerParams],
+        queryFn: async () =>
+          (await import("@/lib/customers-directory")).fetchCustomersDirectory(customerParams),
         staleTime: 60_000,
       });
     }
     if (href === "/leads") {
       queryClient.prefetchQuery({
-        queryKey: ["leads", "", "", 1],
-        queryFn: async () => (await api.get("/leads", { params: { page: 1, limit: 50 } })).data,
+        queryKey: ["leads", "", "", 1, DEFAULT_PAGE_SIZE],
+        queryFn: async () =>
+          (await api.get("/leads", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
         staleTime: 60_000,
+      });
+    }
+    if (href === "/team-updates") {
+      queryClient.prefetchQuery({
+        queryKey: ["team-updates-summary"],
+        queryFn: async () => (await api.get("/team-updates/summary")).data,
+        staleTime: 60_000,
+      });
+    }
+    if (href === "/invoices") {
+      queryClient.prefetchQuery({
+        queryKey: ["invoices", 1, DEFAULT_PAGE_SIZE],
+        queryFn: async () =>
+          (await api.get("/invoices", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
+        staleTime: 30_000,
+      });
+    }
+    if (href === "/projects") {
+      queryClient.prefetchQuery({
+        queryKey: ["projects", 1],
+        queryFn: async () =>
+          (await api.get("/projects", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
+        staleTime: 30_000,
       });
     }
   }
@@ -106,6 +162,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       return res.data;
     },
     enabled: !!accessToken,
+    staleTime: 60_000,
     refetchInterval: 60_000,
   });
   const teamBadgeCount = teamSummary?.openTotal ?? 0;
@@ -124,27 +181,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     items: group.items.filter((item) => canAccessNav(user?.role, item.href)),
   })).filter((g) => g.items.length > 0);
 
-  const bottomNavItems = BOTTOM_NAV_ITEMS.filter((item) =>
-    canAccessNav(user?.role, item.href),
-  );
-
   return (
     <div className="flex min-h-screen bg-background">
-      <RouteProgress />
+      <RouteProgress color={routeColor.spark} />
       <aside
-        className="sticky top-0 flex h-screen min-h-0 shrink-0 flex-col bg-sidebar text-sidebar-foreground"
+        className="sticky top-0 flex h-screen min-h-0 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground"
         style={{ width: "var(--sidebar-width)" }}
       >
-        <div className="shrink-0 border-b border-white/10 px-5 py-5">
-          <TechPotliLogo size="sm" className="items-start" />
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-indigo-200/50">
-            CRM Console
-          </p>
+        <div className="shrink-0 border-b border-border px-4 py-3.5">
+          <TechPotliLogo size="md" className="items-start" />
         </div>
-        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+        <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2.5 py-3">
           {visibleGroups.map((group) => (
             <div key={group.label}>
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-indigo-200/40">
+              <p className="mb-1 px-2.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/70">
                 {group.label}
               </p>
               <div className="space-y-0.5">
@@ -152,26 +202,30 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   const active =
                     pathname === href ||
                     (href !== "/dashboard" && pathname.startsWith(href));
-                  const teamUpdatesHighlight =
-                    href === "/team-updates" && teamBadgeCount > 0 && !active;
                   return (
                     <Link
                       key={href}
                       href={href}
                       onMouseEnter={() => prefetchRoute(href)}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
+                        "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors",
                         active
-                          ? "bg-primary text-primary-foreground shadow-md shadow-indigo-900/40"
-                          : teamUpdatesHighlight
-                            ? "bg-primary/25 text-white ring-1 ring-primary/50 shadow-sm shadow-primary/20 hover:bg-primary/35"
-                            : "text-indigo-100/80 hover:bg-white/10 hover:text-white",
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="flex-1">{label}</span>
+                      {active ? (
+                        <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-foreground" />
+                      ) : null}
+                      <Icon
+                        className={cn(
+                          "h-4 w-4 shrink-0",
+                          active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{label}</span>
                       {href === "/team-updates" && teamBadgeCount > 0 ? (
-                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white tabular-nums">
                           {teamBadgeCount > 99 ? "99+" : teamBadgeCount}
                         </span>
                       ) : null}
@@ -182,49 +236,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="shrink-0 border-t border-white/10 bg-sidebar p-3 shadow-[0_-4px_24px_rgba(0,0,0,0.25)]">
-          {bottomNavItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
-                  active
-                    ? "bg-primary text-primary-foreground shadow-md shadow-indigo-900/40"
-                    : "text-indigo-100/80 hover:bg-white/10 hover:text-white",
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
-          <Link
-            href="/profile"
-            className={cn(
-              "mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
-              pathname === "/profile"
-                ? "bg-primary text-primary-foreground shadow-md shadow-indigo-900/40"
-                : "text-indigo-100/80 hover:bg-white/10 hover:text-white",
-            )}
-          >
-            <User className="h-4 w-4 shrink-0" />
-            <span>Profile</span>
-          </Link>
+        <div className="shrink-0 border-t border-border p-2.5">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/10"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition hover:bg-muted/80"
               >
                 <UserAvatar name={user?.name ?? "User"} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{user?.name ?? "User"}</p>
-                  <p className="truncate text-[10px] text-indigo-200/60">{roleLabel(user?.role)}</p>
+                  <p className="truncate text-sm font-medium text-foreground">{user?.name ?? "User"}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{roleLabel(user?.role)}</p>
                 </div>
-                <ChevronDown className="h-4 w-4 shrink-0 text-indigo-200/60" />
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
@@ -260,68 +284,44 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border/60 bg-card/80 px-6 py-4 backdrop-blur-md">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="min-w-0">
-              {isDashboard ? (
-                <>
-                  <h1 className="text-xl font-bold tracking-tight">
-                    Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}! 👋
-                  </h1>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Here&apos;s what&apos;s happening with your leads today.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h1 className="text-lg font-bold tracking-tight capitalize">
-                    {visibleGroups.flatMap((g) => g.items).find(
-                      (i) => pathname === i.href || pathname.startsWith(i.href + "/"),
-                    )?.label ?? "TechPotli"}
-                  </h1>
-                  {user?.email ? (
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                  ) : null}
-                </>
-              )}
+        <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-2.5 backdrop-blur-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="hidden flex-1 md:flex md:max-w-md lg:max-w-lg">
+              <GlobalSearch />
             </div>
-            <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
-              <div className="hidden flex-1 justify-center md:flex md:max-w-md">
-                <GlobalSearch />
-              </div>
-              <div className="flex items-center gap-2">
-                <Link
-                  href={cta.href}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-indigo-600"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {cta.label}
+            <div className="flex flex-1 items-center justify-end gap-1.5">
+              <Link href={cta.href} className={cn(routeColor.btn, "!text-xs")}>
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{cta.label}</span>
+              </Link>
+              <Link href="/leads" className="crm-btn-ghost !px-2.5" title="Follow-ups">
+                <Calendar className="h-4 w-4" />
+              </Link>
+              <NotificationBell />
+              {superAdmin ? (
+                <Link href="/settings" className="crm-btn-ghost !px-2.5" title="Settings">
+                  <Settings className="h-4 w-4" />
                 </Link>
-                <Link
-                  href="/leads"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  title="Follow-ups"
-                >
-                  <Calendar className="h-4 w-4" />
-                </Link>
-                <NotificationBell />
-                {superAdmin ? (
-                  <Link
-                    href="/settings"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Link>
-                ) : null}
-                <ThemeToggle />
-              </div>
+              ) : null}
+              <ThemeToggle />
             </div>
           </div>
-          <div className="mt-3 md:hidden">
+          <div className="mt-2 md:hidden">
             <GlobalSearch />
           </div>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 space-y-3 p-4 md:p-5">
+          {showHero ? (
+            <SectionHero
+              group={pageMeta.group}
+              title={pageMeta.title}
+              description={pageMeta.description}
+              color={routeColor}
+              icon={PageIcon}
+            />
+          ) : null}
+          {children}
+        </main>
       </div>
       <TeamUpdateToast />
     </div>

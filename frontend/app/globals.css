@@ -1,36 +1,38 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f6f9;
-  --foreground: #0f172a;
-  --primary: #6366f1;
+  --background: #f8f9fb;
+  --foreground: #09090b;
+  --primary: #18181b;
   --primary-foreground: #ffffff;
-  --accent: #06b6d4;
+  --accent: #2563eb;
   --accent-foreground: #ffffff;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --border: #e2e8f0;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
   --card: #ffffff;
-  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --sidebar: #1a163a;
-  --sidebar-foreground: #e0e7ff;
-  --sidebar-width: 16rem;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.04);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #09090b;
+  --sidebar-width: 14rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
 
 html.dark {
-  --background: #0b1120;
-  --foreground: #e2e8f0;
-  --primary: #818cf8;
-  --primary-foreground: #ffffff;
-  --accent: #22d3ee;
-  --accent-foreground: #0f172a;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --border: #334155;
-  --card: #1e293b;
-  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
-  --sidebar: #0f172a;
-  --sidebar-foreground: #c7d2fe;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --border: #3f3f46;
+  --card: #18181b;
+  --card-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  --sidebar: #18181b;
+  --sidebar-foreground: #fafafa;
 }
 
 @theme inline {
@@ -54,11 +56,150 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--primary) 30%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
+}
+
+/* Shared CRM page patterns */
+.crm-page {
+  animation: crm-fade-in 0.18s ease-out;
+}
+
+@keyframes crm-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.crm-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.crm-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: var(--radius-lg);
+  background: var(--primary);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.crm-btn-primary:hover {
+  background: color-mix(in srgb, var(--primary) 88%, white);
+}
+
+.crm-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Feature-accent buttons (dashboard & team areas) */
+.crm-btn-indigo,
+.crm-btn-emerald,
+.crm-btn-cyan,
+.crm-btn-amber,
+.crm-btn-violet,
+.crm-btn-teal,
+.crm-btn-sky,
+.crm-btn-slate,
+.crm-btn-rose,
+.crm-btn-fuchsia,
+.crm-btn-orange {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: var(--radius-lg);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.crm-btn-indigo { background: #4f46e5; }
+.crm-btn-indigo:hover { filter: brightness(1.08); }
+.crm-btn-emerald { background: #059669; }
+.crm-btn-emerald:hover { filter: brightness(1.08); }
+.crm-btn-cyan { background: #0891b2; }
+.crm-btn-cyan:hover { filter: brightness(1.08); }
+.crm-btn-amber { background: #d97706; }
+.crm-btn-amber:hover { filter: brightness(1.08); }
+.crm-btn-violet { background: #7c3aed; }
+.crm-btn-violet:hover { filter: brightness(1.08); }
+.crm-btn-teal { background: #0d9488; }
+.crm-btn-teal:hover { filter: brightness(1.08); }
+.crm-btn-sky { background: #0284c7; }
+.crm-btn-sky:hover { filter: brightness(1.08); }
+.crm-btn-slate { background: #475569; }
+.crm-btn-slate:hover { filter: brightness(1.08); }
+.crm-btn-rose { background: #e11d48; }
+.crm-btn-rose:hover { filter: brightness(1.08); }
+.crm-btn-fuchsia { background: #c026d3; }
+.crm-btn-fuchsia:hover { filter: brightness(1.08); }
+.crm-btn-orange { background: #ea580c; }
+.crm-btn-orange:hover { filter: brightness(1.08); }
+
+.crm-btn-indigo:disabled,
+.crm-btn-emerald:disabled,
+.crm-btn-cyan:disabled,
+.crm-btn-amber:disabled,
+.crm-btn-violet:disabled,
+.crm-btn-teal:disabled,
+.crm-btn-sky:disabled,
+.crm-btn-slate:disabled,
+.crm-btn-rose:disabled,
+.crm-btn-fuchsia:disabled,
+.crm-btn-orange:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.crm-input {
+  border-radius: var(--radius-lg);
+}
+
+.crm-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.crm-btn-ghost:hover {
+  background: var(--muted);
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--foreground));
 }
 
 @keyframes auth-shimmer {

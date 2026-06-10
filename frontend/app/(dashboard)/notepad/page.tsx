@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { GlassCard } from "@/components/ui/glass-card";
 import { TextArea, TextInput } from "@/components/ui/form-field";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/format";
 
 type UserNote = {
   id: string;
@@ -153,7 +154,7 @@ export default function NotepadPage() {
                   >
                     <p className="truncate font-medium">{note.title || "Untitled"}</p>
                     <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {new Date(note.updatedAt).toLocaleString()}
+                      {formatDateTime(note.updatedAt)}
                       {note.isDraft ? " · Draft" : ""}
                     </p>
                   </button>

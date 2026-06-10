@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { DEFAULT_PAGE_SIZE, normalizePaginated } from "@/lib/pagination";
-import { formatDateTime, formatLabel } from "@/lib/format";
+import { formatDate, formatDateTime, formatLabel } from "@/lib/format";
 import { useAssignees } from "@/hooks/use-users";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -388,7 +388,7 @@ export function CustomerWorkHub({
                     {item.dueDate ? (
                       <p className="mt-1 flex items-center justify-end gap-1">
                         <Clock className="h-3 w-3" />
-                        Due {formatDateTime(item.dueDate)}
+                        Due {formatDate(item.dueDate)}
                       </p>
                     ) : null}
                   </div>

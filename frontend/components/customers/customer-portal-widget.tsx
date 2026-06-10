@@ -6,6 +6,7 @@ import { appendListItem, createTempId, patchListItem } from "@/lib/optimistic-mu
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
+import { formatDateTime } from "@/lib/format";
 
 type PortalAccess = {
   id: string;
@@ -122,7 +123,7 @@ export function CustomerPortalWidget({ customerId }: { customerId: string }) {
         {activeAccess?.lastVisitedAt ? (
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Last visit</dt>
-            <dd>{new Date(activeAccess.lastVisitedAt).toLocaleString()}</dd>
+            <dd>{formatDateTime(activeAccess.lastVisitedAt)}</dd>
           </div>
         ) : null}
         {activeAccess ? (

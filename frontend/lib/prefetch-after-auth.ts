@@ -38,5 +38,13 @@ export async function prefetchAfterAuth(
     );
   }
 
+  tasks.push(
+    queryClient.prefetchQuery({
+      queryKey: ["team-updates-summary"],
+      queryFn: async () => (await api.get("/team-updates/summary")).data,
+      staleTime: 60_000,
+    }),
+  );
+
   await Promise.allSettled(tasks);
 }

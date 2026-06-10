@@ -5,6 +5,7 @@ import { PremiumDataTable, type RowAction } from "@/components/dashboard/premium
 import { CompanyAvatar } from "@/components/leads/lead-badges";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/format";
 
 export type CustomerRow = Record<string, unknown> & {
   id: string;
@@ -18,14 +19,6 @@ export type CustomerRow = Record<string, unknown> & {
   assignedEmployee?: { id?: string; name?: string };
   openWorkItemCount?: number;
 };
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString("en-IN", {
