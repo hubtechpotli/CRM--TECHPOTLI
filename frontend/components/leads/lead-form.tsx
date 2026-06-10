@@ -122,13 +122,11 @@ export function LeadForm({
         const leadId = String(lead!.id);
         patchDetailItem(queryClient, ["lead", leadId], body);
         patchMatchingListItems(queryClient, ["leads"], leadId, body);
-        onSuccess?.({ id: leadId, ...body });
         return {};
       }
       const tempId = createTempId();
       const optimistic = { id: tempId, status: "NEW", ...body };
       appendToMatchingLists(queryClient, ["leads"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -139,6 +137,9 @@ export function LeadForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {

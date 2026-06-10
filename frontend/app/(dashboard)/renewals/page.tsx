@@ -12,6 +12,7 @@ import { DataTable } from "@/components/dashboard/data-table";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
 import { RenewalForm } from "@/components/renewals/renewal-form";
+import { isTempId } from "@/lib/optimistic-mutation";
 
 type RenewalRow = Record<string, unknown> & {
   customer?: { companyName?: string };
@@ -102,7 +103,8 @@ export default function RenewalsPage() {
           onCancel={() => setShowNew(false)}
           onSuccess={(data) => {
             setShowNew(false);
-            if (data.id) router.push(`/renewals/${data.id}`);
+            const id = String(data.id ?? "");
+            if (id && !isTempId(id)) router.push(`/renewals/${id}`);
           }}
         />
       </Modal>

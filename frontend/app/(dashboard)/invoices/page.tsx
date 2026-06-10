@@ -12,6 +12,7 @@ import { DataTable } from "@/components/dashboard/data-table";
 import { Modal } from "@/components/ui/modal";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
+import { isTempId } from "@/lib/optimistic-mutation";
 
 type InvoiceRow = Record<string, unknown> & {
   customer?: { companyName?: string };
@@ -102,7 +103,8 @@ export default function InvoicesPage() {
           onCancel={() => setShowNew(false)}
           onSuccess={(data) => {
             setShowNew(false);
-            if (data.id) router.push(`/invoices/${data.id}`);
+            const id = String(data.id ?? "");
+            if (id && !isTempId(id)) router.push(`/invoices/${id}`);
           }}
         />
       </Modal>

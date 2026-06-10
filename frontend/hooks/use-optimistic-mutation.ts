@@ -7,6 +7,7 @@ import {
   type UseMutationOptions,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   restoreQueries,
   snapshotQueries,
@@ -49,7 +50,8 @@ export function useOptimisticMutation<
   const {
     snapshotKeys,
     invalidateKeys,
-    errorMessage = "Could not save changes. Reverted.",
+    errorMessage = (err: TError) =>
+      getApiErrorMessage(err, "Could not save changes. Reverted."),
     onMutate,
     onError,
     onSuccess,

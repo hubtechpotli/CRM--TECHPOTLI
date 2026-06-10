@@ -6,10 +6,17 @@ export function snapshotQueries(
   client: QueryClient,
   keys: QueryKey[],
 ): QuerySnapshot[] {
-  return keys.map((queryKey) => ({
-    queryKey,
-    data: client.getQueryData(queryKey),
-  }));
+  const seen = new Set<string>();
+  const snapshots: QuerySnapshot[] = [];
+  for (const prefix of keys) {
+    for (const query of client.getQueryCache().findAll({ queryKey: prefix })) {
+      const key = JSON.stringify(query.queryKey);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      snapshots.push({ queryKey: query.queryKey, data: query.state.data });
+    }
+  }
+  return snapshots;
 }
 
 export function restoreQueries(client: QueryClient, snapshots: QuerySnapshot[]) {

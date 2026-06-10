@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
-import { patchDetailItem } from "@/lib/optimistic-mutation";
+import { patchDetailItem, isTempId } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -34,6 +34,7 @@ export default function QuotationDetailPage() {
       const res = await api.get<QuotationDetail>(`/quotations/${id}`);
       return res.data;
     },
+    enabled: !isTempId(id),
   });
 
   const quotationKey = ["quotation", id] as const;
@@ -54,6 +55,10 @@ export default function QuotationDetailPage() {
     if (!data?.approvalToken) return;
     const url = `${window.location.origin}/quote/approve/${data.approvalToken}`;
     await navigator.clipboard.writeText(url);
+  }
+
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving new quotation…</p>;
   }
 
   if (isLoading) {

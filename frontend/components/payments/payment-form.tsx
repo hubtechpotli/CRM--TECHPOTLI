@@ -63,7 +63,6 @@ export function PaymentForm({
         status: form.status,
       };
       appendToMatchingLists(queryClient, ["payments"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -74,6 +73,9 @@ export function PaymentForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {

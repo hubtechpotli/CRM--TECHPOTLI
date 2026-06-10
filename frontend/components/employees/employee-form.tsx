@@ -119,7 +119,6 @@ export function EmployeeForm({
           isActive: payload.isActive === "true",
         };
         patchMatchingListItems(queryClient, ["employees"], employeeId, patch);
-        onSuccess?.({ id: employeeId, ...patch });
         return {};
       }
       const tempId = createTempId();
@@ -130,7 +129,6 @@ export function EmployeeForm({
         role: payload.role,
       };
       appendToMatchingLists(queryClient, ["employees"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -141,6 +139,9 @@ export function EmployeeForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {
