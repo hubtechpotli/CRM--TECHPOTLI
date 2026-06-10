@@ -2,7 +2,8 @@ import { Response } from 'express';
 
 const REFRESH_COOKIE = 'refreshToken';
 const REFRESH_MAX_AGE = 7 * 24 * 60 * 60;
-const COOKIE_PATH = '/api';
+/** Root path so the refresh cookie is sent reliably via Next.js /api proxy and direct API calls. */
+const COOKIE_PATH = '/';
 
 type SameSiteValue = 'Strict' | 'Lax' | 'None';
 
