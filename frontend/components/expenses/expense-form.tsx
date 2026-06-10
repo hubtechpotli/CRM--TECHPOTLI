@@ -53,7 +53,6 @@ export function ExpenseForm({
         status: "PENDING",
       };
       appendToMatchingLists(queryClient, ["expenses"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -64,6 +63,9 @@ export function ExpenseForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {

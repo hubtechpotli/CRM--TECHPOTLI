@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
-import { appendDetailListItem, createTempId, patchDetailItem } from "@/lib/optimistic-mutation";
+import { appendDetailListItem, createTempId, isTempId, patchDetailItem } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
@@ -48,6 +48,7 @@ export default function ProjectDetailPage() {
       const res = await api.get<ProjectDetail>(`/projects/${id}`);
       return res.data;
     },
+    enabled: !isTempId(id),
   });
 
   const projectKey = ["project", id] as const;
@@ -121,6 +122,10 @@ export default function ProjectDetailPage() {
       setTimeLog({ startTime: "", endTime: "", notes: "" });
     },
   });
+
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving new project…</p>;
+  }
 
   if (isLoading) {
     return <CustomerDetailSkeleton />;

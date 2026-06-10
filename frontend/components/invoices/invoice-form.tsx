@@ -62,7 +62,6 @@ export function InvoiceForm({
       const tempId = createTempId();
       const optimistic = { id: tempId, customerId, status: "DRAFT", dueDate };
       appendToMatchingLists(queryClient, ["invoices"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -73,6 +72,9 @@ export function InvoiceForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {

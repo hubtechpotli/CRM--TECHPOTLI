@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -80,10 +80,16 @@ export class UsersService {
   async create(data: CreateUserDto, actorRole: UserRole) {
     this.assertCanAssignRole(actorRole, data.role);
 
+    const email = data.email.toLowerCase();
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('Email already in use');
+    }
+
     const hash = await bcrypt.hash(data.password, 12);
     return this.prisma.user.create({
       data: {
-        email: data.email.toLowerCase(),
+        email,
         passwordHash: hash,
         name: data.name.trim(),
         role: data.role,

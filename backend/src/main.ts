@@ -9,6 +9,7 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { validateProductionEnv, warnIfNoOfficeIps } from './bootstrap/validate-env';
 import { resolveCorsOrigin } from './common/utils/cors-origins.util';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
@@ -44,6 +45,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
