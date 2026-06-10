@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-06-10T17:36:24.269Z",
+  "baseURL": "http://localhost:3001/api",
+  "iterations": 25,
+  "results": [
+    {
+      "name": "Dashboard (/reports/crm-insights)",
+      "samples": 25,
+      "p50": 2191,
+      "p95": 2515,
+      "p99": 2696,
+      "min": 1912,
+      "max": 2696,
+      "avg": 2186,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Dashboard KPIs (/reports/dashboard)",
+      "samples": 25,
+      "p50": 2118,
+      "p95": 2292,
+      "p99": 2557,
+      "min": 1964,
+      "max": 2557,
+      "avg": 2137,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Customers (/customers/directory)",
+      "samples": 25,
+      "p50": 2466,
+      "p95": 2914,
+      "p99": 5396,
+      "min": 2205,
+      "max": 5396,
+      "avg": 2579,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Projects (/projects)",
+      "samples": 25,
+      "p50": 2881,
+      "p95": 3200,
+      "p99": 3201,
+      "min": 2537,
+      "max": 3201,
+      "avg": 2917,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Reports MRR (/reports/mrr)",
+      "samples": 25,
+      "p50": 2073,
+      "p95": 2370,
+      "p99": 2495,
+      "min": 2029,
+      "max": 2495,
+      "avg": 2137,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Reports employee-perf",
+      "samples": 25,
+      "p50": 2068,
+      "p95": 2354,
+      "p99": 2372,
+      "min": 2030,
+      "max": 2372,
+      "avg": 2106,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Search (/search?q=test)",
+      "samples": 25,
+      "p50": 2089,
+      "p95": 2637,
+      "p99": 4868,
+      "min": 1931,
+      "max": 4868,
+      "avg": 2269,
+      "errors": 0,
+      "lastStatus": 200
+    },
+    {
+      "name": "Team Updates (/team-updates/feed)",
+      "samples": 25,
+      "p50": 2015,
+      "p95": 2592,
+      "p99": 4609,
+      "min": 1960,
+      "max": 4609,
+      "avg": 2186,
+      "errors": 0,
+      "lastStatus": 200
+    }
+  ]
+}
