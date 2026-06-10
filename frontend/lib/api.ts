@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
+import { isJwtExpired } from "@/lib/jwt";
 
 function apiOriginFromEnv(envUrl: string): string | null {
   const trimmed = envUrl.replace(/\/$/, "");
@@ -90,7 +91,14 @@ function shouldForceLogout(error: AxiosError): boolean {
   return false;
 }
 
+function hasValidAccessToken(): boolean {
+  const store = useAuthStore.getState();
+  const token = store.restoreSessionToken();
+  return !!token && !isJwtExpired(token);
+}
+
 function redirectToLogin() {
+  if (hasValidAccessToken()) return;
   useAuthStore.getState().logout();
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
     window.location.href = "/login";
@@ -143,8 +151,10 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (original && shouldForceLogout(error) && original.url?.includes("/auth/refresh")) {
-      redirectToLogin();
+    if (original?.url?.includes("/auth/refresh") && shouldForceLogout(error)) {
+      if (!hasValidAccessToken()) {
+        redirectToLogin();
+      }
       return Promise.reject(error);
     }
 

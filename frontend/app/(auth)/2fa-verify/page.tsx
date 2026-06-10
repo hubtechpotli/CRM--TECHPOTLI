@@ -45,9 +45,9 @@ export default function TwoFactorVerifyPage() {
         14 * 60_000,
       );
       if (data.user.mustChangePassword) {
-        router.push("/security/change-password");
+        router.replace("/security/change-password");
       } else {
-        router.push("/dashboard");
+        router.replace("/dashboard");
       }
     } catch (err) {
       const message = isAxiosError(err)

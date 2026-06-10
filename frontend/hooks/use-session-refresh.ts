@@ -18,7 +18,9 @@ export function useSessionRefresh() {
 
     const tick = () => {
       if (document.visibilityState !== "visible") return;
-      const token = useAuthStore.getState().accessToken;
+      const store = useAuthStore.getState();
+      if (store.isInAuthGracePeriod()) return;
+      const token = store.restoreSessionToken();
       if (!token || isJwtExpired(token, 3 * 60_000)) {
         void refreshAccessToken();
       }

@@ -73,7 +73,7 @@ export default function LoginPage() {
         if (data.user.mustChangePassword) {
           router.push("/security/change-password");
         } else {
-          router.push("/dashboard");
+          router.replace("/dashboard");
         }
         return;
       }

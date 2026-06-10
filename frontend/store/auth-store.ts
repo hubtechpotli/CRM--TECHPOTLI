@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { isJwtExpired } from "@/lib/jwt";
 
 const SESSION_TOKEN_KEY = "techpotli-access-token";
+const AUTH_GRACE_MS = 2 * 60_000;
 
 export type AuthUser = {
   id: string;
@@ -20,6 +21,7 @@ type AuthState = {
   setupToken: string | null;
   pending2FA: boolean;
   pending2FASetup: boolean;
+  authenticatedAt: number | null;
   setAuth: (
     user: AuthUser,
     accessToken: string,
@@ -30,6 +32,8 @@ type AuthState = {
   setPending2FASetup: (pending: boolean, setupToken?: string | null) => void;
   setAccessToken: (accessToken: string, sessionId?: string | null, expiresInMs?: number) => void;
   restoreSessionToken: () => string | null;
+  hasValidSession: () => boolean;
+  isInAuthGracePeriod: () => boolean;
   logout: () => void;
 };
 
@@ -50,11 +54,18 @@ function clearSessionToken() {
 function readSessionToken(): string | null {
   if (typeof window === "undefined") return null;
   const token = localStorage.getItem(SESSION_TOKEN_KEY);
-  if (!token || isJwtExpired(token)) {
+  if (!token) return null;
+  if (isJwtExpired(token)) {
     clearSessionToken();
     return null;
   }
   return token;
+}
+
+function pickLiveToken(currentToken: string | null, storedToken: string | null): string | null {
+  if (currentToken && !isJwtExpired(currentToken)) return currentToken;
+  if (storedToken && !isJwtExpired(storedToken)) return storedToken;
+  return null;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -67,6 +78,7 @@ export const useAuthStore = create<AuthState>()(
       setupToken: null,
       pending2FA: false,
       pending2FASetup: false,
+      authenticatedAt: null,
       setAuth: (user, accessToken, sessionId = null) => {
         writeSessionToken(accessToken);
         set({
@@ -77,22 +89,35 @@ export const useAuthStore = create<AuthState>()(
           pending2FASetup: false,
           tempToken: null,
           setupToken: null,
+          authenticatedAt: Date.now(),
         });
       },
       setPending2FA: (pending2FA, tempToken = null) =>
-        set({ pending2FA, tempToken }),
+        set({ pending2FA, tempToken, accessToken: null, authenticatedAt: null }),
       setPending2FASetup: (pending2FASetup, setupToken = null) =>
-        set({ pending2FASetup, setupToken }),
+        set({ pending2FASetup, setupToken, accessToken: null, authenticatedAt: null }),
       setAccessToken: (accessToken, sessionId = null) => {
         writeSessionToken(accessToken);
-        set({ accessToken, sessionId: sessionId ?? get().sessionId });
+        set({
+          accessToken,
+          sessionId: sessionId ?? get().sessionId,
+          authenticatedAt: get().authenticatedAt ?? Date.now(),
+        });
       },
       restoreSessionToken: () => {
-        const existing = get().accessToken;
-        if (existing && !isJwtExpired(existing)) return existing;
-        const token = readSessionToken();
-        if (token) set({ accessToken: token });
+        const token = pickLiveToken(get().accessToken, readSessionToken());
+        if (token && token !== get().accessToken) {
+          set({ accessToken: token });
+        }
         return token;
+      },
+      hasValidSession: () => {
+        const token = pickLiveToken(get().accessToken, readSessionToken());
+        return !!token;
+      },
+      isInAuthGracePeriod: () => {
+        const at = get().authenticatedAt;
+        return !!at && Date.now() - at < AUTH_GRACE_MS;
       },
       logout: () => {
         clearSessionToken();
@@ -104,11 +129,13 @@ export const useAuthStore = create<AuthState>()(
           setupToken: null,
           pending2FA: false,
           pending2FASetup: false,
+          authenticatedAt: null,
         });
       },
     }),
     {
       name: "techpotli-auth",
+      version: 2,
       partialize: (state) => ({
         user: state.user,
         sessionId: state.sessionId,
@@ -117,6 +144,33 @@ export const useAuthStore = create<AuthState>()(
         tempToken: state.tempToken,
         setupToken: state.setupToken,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<AuthState>;
+        const storedToken = readSessionToken();
+        const liveToken = pickLiveToken(currentState.accessToken, storedToken);
+        const hasLiveSession = !!liveToken;
+
+        if (hasLiveSession) {
+          return {
+            ...currentState,
+            ...persisted,
+            accessToken: liveToken,
+            user: currentState.user ?? persisted.user ?? null,
+            sessionId: currentState.sessionId ?? persisted.sessionId ?? null,
+            pending2FA: false,
+            pending2FASetup: false,
+            tempToken: null,
+            setupToken: null,
+            authenticatedAt: currentState.authenticatedAt ?? Date.now(),
+          };
+        }
+
+        return {
+          ...currentState,
+          ...persisted,
+          accessToken: liveToken,
+        };
+      },
     },
   ),
 );

@@ -98,8 +98,8 @@ export default function Setup2faPage() {
           type="button"
           onClick={() => {
             const u = useAuthStore.getState().user;
-            if (u?.mustChangePassword) router.push("/security/change-password");
-            else router.push("/dashboard");
+            if (u?.mustChangePassword) router.replace("/security/change-password");
+            else router.replace("/dashboard");
           }}
           className="mt-6 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
         >
