@@ -75,6 +75,7 @@ export class CustomersController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN)
   remove(@Param('id') id: string) {
     return this.customers.remove(id);
   }

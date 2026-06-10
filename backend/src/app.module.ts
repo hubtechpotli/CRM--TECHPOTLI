@@ -43,6 +43,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { WorkflowModule } from './workflow/workflow.module';
 import { EmailModule } from './email/email.module';
 import { TeamUpdatesModule } from './team-updates/team-updates.module';
+import { NotepadModule } from './notepad/notepad.module';
 
 const cronJobModules =
   process.env.ENABLE_CRON_JOBS === 'true' && process.env.APP_MODE !== 'worker' ? [JobsModule] : [];
@@ -92,6 +93,7 @@ const cronJobModules =
     SupportModule,
     ReportsModule,
     TeamUpdatesModule,
+    NotepadModule,
     SettingsModule,
     ApprovalsModule,
     SearchModule,

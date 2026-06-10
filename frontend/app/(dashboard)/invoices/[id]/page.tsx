@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,20 +9,28 @@ import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { Modal } from "@/components/ui/modal";
+import { PaymentForm } from "@/components/payments/payment-form";
 import { isTempId } from "@/lib/optimistic-mutation";
 
 type LineItem = { name: string; qty: number; rate: number; amount: number };
 
+type InvoicePayment = { paidAmount?: number | string; status?: string };
+
 type InvoiceDetail = Record<string, unknown> & {
+  customerId?: string;
   customer?: { companyName?: string; email?: string };
   lineItems?: LineItem[];
   pdfViewUrl?: string | null;
+  grandTotal?: number | string;
+  payments?: InvoicePayment[];
 };
 
 export default function InvoiceDetailPage() {
   const params = useParams();
   const id = String(params.id);
   const queryClient = useQueryClient();
+  const [showRecordPayment, setShowRecordPayment] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["invoice", id],
@@ -65,6 +74,15 @@ export default function InvoiceDetailPage() {
   }
 
   const lineItems = Array.isArray(data.lineItems) ? data.lineItems : [];
+  const grandTotal = Number(data.grandTotal ?? 0);
+  const linkedPayments = Array.isArray(data.payments) ? data.payments : [];
+  const paidSoFar = linkedPayments.reduce((sum, p) => {
+    if (String(p.status ?? "") === "PAID") return sum + Number(p.paidAmount ?? 0);
+    return sum;
+  }, 0);
+  const remainingBalance = Math.max(0, grandTotal - paidSoFar);
+  const customerId = String(data.customerId ?? "");
+
   const mutationError = sendMutation.isError
     ? isAxiosError(sendMutation.error)
       ? (() => {
@@ -84,6 +102,15 @@ export default function InvoiceDetailPage() {
         description={`${data.customer?.companyName ?? "Customer"} · ${formatLabel(String(data.status ?? "—"))}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
+            {remainingBalance > 0 && customerId ? (
+              <button
+                type="button"
+                onClick={() => setShowRecordPayment(true)}
+                className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
+              >
+                Record collection
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -172,6 +199,14 @@ export default function InvoiceDetailPage() {
               <dt>Grand total</dt>
               <dd>{formatMoney(data.grandTotal)}</dd>
             </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Collected</dt>
+              <dd>{formatMoney(paidSoFar)}</dd>
+            </div>
+            <div className="flex justify-between font-medium">
+              <dt>Balance due</dt>
+              <dd>{formatMoney(remainingBalance)}</dd>
+            </div>
           </dl>
           {data.notes ? (
             <div className="mt-4 border-t border-border/40 pt-3">
@@ -214,6 +249,25 @@ export default function InvoiceDetailPage() {
           </div>
         </GlassCard>
       </div>
+
+      <Modal open={showRecordPayment} onClose={() => setShowRecordPayment(false)} title="Record collection">
+        <PaymentForm
+          defaultValues={{
+            customerId,
+            invoiceId: id,
+            totalAmount: String(grandTotal),
+            paidAmount: String(remainingBalance),
+            status: "PAID",
+          }}
+          onCancel={() => setShowRecordPayment(false)}
+          onSuccess={() => {
+            setShowRecordPayment(false);
+            void queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+            void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+            void queryClient.invalidateQueries({ queryKey: ["payments"] });
+          }}
+        />
+      </Modal>
     </div>
   );
 }

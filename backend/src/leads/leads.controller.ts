@@ -114,7 +114,7 @@ export class LeadsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.leads.remove(id, user.role, user.sub);
   }

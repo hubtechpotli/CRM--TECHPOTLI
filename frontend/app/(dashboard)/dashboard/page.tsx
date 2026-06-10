@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, IndianRupee, Trophy, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { Calendar, IndianRupee, Receipt, Trophy, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
@@ -75,6 +76,18 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: collectionsSummary, isLoading: collectionsLoading } = useQuery({
+    queryKey: ["payments-summary"],
+    queryFn: async () => {
+      const res = await api.get<{
+        today: { count: number; amount: number };
+        month: { count: number; amount: number };
+      }>("/payments/summary");
+      return res.data;
+    },
+    enabled: adminView,
+  });
+
   const filteredLeads = useMemo(() => {
     const leads = insights?.recentLeads ?? [];
     if (!statusFilter) return leads;
@@ -138,6 +151,49 @@ export default function DashboardPage() {
       </div>
 
       <TeamUpdatesPanel highlighted />
+
+      {adminView ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <KpiSparklineCard
+            label="Today's collections"
+            value={
+              collectionsSummary
+                ? `₹${collectionsSummary.today.amount.toLocaleString("en-IN")}`
+                : "—"
+            }
+            trendLabel={
+              collectionsSummary
+                ? `${collectionsSummary.today.count} payment${collectionsSummary.today.count === 1 ? "" : "s"} today`
+                : "Paid collections today"
+            }
+            icon={Receipt}
+            iconBg="bg-violet-500/10"
+            iconColor="text-violet-600"
+            sparkColor="#8b5cf6"
+            loading={collectionsLoading}
+          />
+          <Link href="/payments" className="block">
+            <KpiSparklineCard
+              label="This month's collections"
+              value={
+                collectionsSummary
+                  ? `₹${collectionsSummary.month.amount.toLocaleString("en-IN")}`
+                  : "—"
+              }
+              trendLabel={
+                collectionsSummary
+                  ? `${collectionsSummary.month.count} collections this month · View all`
+                  : "View collections"
+              }
+              icon={IndianRupee}
+              iconBg="bg-emerald-500/10"
+              iconColor="text-emerald-600"
+              sparkColor="#10b981"
+              loading={collectionsLoading}
+            />
+          </Link>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">

@@ -15,6 +15,7 @@ import {
   Receipt,
   RefreshCw,
   Settings,
+  StickyNote,
   UserCog,
   UserPlus,
   Users,
@@ -36,6 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Main",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/notepad", label: "Notepad", icon: StickyNote },
       { href: "/team-updates", label: "Team Updates", icon: MessageSquare },
     ],
   },
@@ -46,7 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/customers", label: "Customers", icon: Users },
       { href: "/quotations", label: "Quotations", icon: FileSpreadsheet },
       { href: "/invoices", label: "Invoices", icon: FileText },
-      { href: "/payments", label: "Payments", icon: CreditCard },
+      { href: "/payments", label: "Collections", icon: CreditCard },
     ],
   },
   {

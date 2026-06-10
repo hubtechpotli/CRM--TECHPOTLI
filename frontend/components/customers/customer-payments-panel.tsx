@@ -1,155 +1,144 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
-import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
+import { FileImage } from "lucide-react";
 import { api } from "@/lib/api";
+import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Modal } from "@/components/ui/modal";
-import { FormField, SelectInput, TextInput } from "@/components/ui/form-field";
-import { PAYMENT_STATUSES } from "@/lib/types";
+import { PaymentForm } from "@/components/payments/payment-form";
 
-type Payment = Record<string, unknown>;
+type PaymentRow = Record<string, unknown> & {
+  proofUrl?: string | null;
+};
 
-function formatLabel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-const emptyForm = {
-  totalAmount: "",
-  bookingAmount: "",
-  paidAmount: "",
-  status: "PENDING",
-  dueDate: "",
-  notes: "",
+type PaymentsResponse = {
+  items: PaymentRow[];
+  total: number;
 };
 
 export function CustomerPaymentsPanel({ customerId }: { customerId: string }) {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState(emptyForm);
 
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: ["customer-payments", customerId],
+  const paymentsKey = ["payments", { customerId }] as const;
+
+  const { data, isLoading } = useQuery({
+    queryKey: paymentsKey,
     queryFn: async () => {
-      const res = await api.get<Payment[]>(`/customers/${customerId}/payments`);
-      return Array.isArray(res.data) ? res.data : [];
-    },
-  });
-
-  const paymentsKey = ["customer-payments", customerId] as const;
-
-  const createMutation = useOptimisticMutation({
-    mutationFn: async () => {
-      const res = await api.post("/payments", {
-        customerId,
-        totalAmount: Number(form.totalAmount),
-        bookingAmount: form.bookingAmount ? Number(form.bookingAmount) : undefined,
-        paidAmount: form.paidAmount ? Number(form.paidAmount) : 0,
-        status: form.status,
-        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
-        notes: form.notes.trim() || undefined,
+      const res = await api.get<PaymentsResponse>("/payments", {
+        params: { customerId, limit: 100 },
       });
       return res.data;
     },
-    snapshotKeys: [paymentsKey, ["payments"]],
-    invalidateKeys: [paymentsKey, ["payments"]],
-    onMutate: () => {
-      appendListItem(queryClient, paymentsKey, {
-        id: createTempId(),
-        totalAmount: Number(form.totalAmount),
-        paidAmount: form.paidAmount ? Number(form.paidAmount) : 0,
-        status: form.status,
-      });
-      setShowAdd(false);
-      setForm(emptyForm);
-    },
   });
 
-  const totalPaid = payments.reduce((sum, p) => sum + Number(p.paidAmount ?? 0), 0);
-  const totalPending = payments.reduce((sum, p) => sum + Number(p.pendingAmount ?? 0), 0);
+  const payments = useMemo(() => data?.items ?? [], [data?.items]);
+
+  const { totalPaid, totalPending } = useMemo(() => {
+    let paid = 0;
+    let pending = 0;
+    for (const p of payments) {
+      paid += Number(p.paidAmount ?? 0);
+      pending += Number(p.pendingAmount ?? 0);
+    }
+    return { totalPaid: paid, totalPending: pending };
+  }, [payments]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-4 text-sm">
-          <span><span className="text-muted-foreground">Total paid:</span> ₹{totalPaid.toLocaleString()}</span>
-          <span><span className="text-muted-foreground">Total pending:</span> ₹{totalPending.toLocaleString()}</span>
+          <span>
+            <span className="text-muted-foreground">Total collected:</span> ₹{totalPaid.toLocaleString("en-IN")}
+          </span>
+          <span>
+            <span className="text-muted-foreground">Pending:</span> ₹{totalPending.toLocaleString("en-IN")}
+          </span>
         </div>
         <button
           type="button"
           onClick={() => setShowAdd(true)}
           className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
         >
-          + Add payment
+          + Record collection
         </button>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading payments…</p>
+        <p className="text-sm text-muted-foreground">Loading collections…</p>
       ) : (
         <GlassCard className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="pb-2 pr-4">Total</th>
-                <th className="pb-2 pr-4">Booking</th>
-                <th className="pb-2 pr-4">Paid</th>
-                <th className="pb-2 pr-4">Pending</th>
+                <th className="pb-2 pr-4">Amount</th>
+                <th className="pb-2 pr-4">Method</th>
                 <th className="pb-2 pr-4">Status</th>
-                <th className="pb-2">Due</th>
+                <th className="pb-2 pr-4">Collected</th>
+                <th className="pb-2 pr-4">Proof</th>
+                <th className="pb-2">Reference</th>
               </tr>
             </thead>
             <tbody>
               {payments.map((p) => (
                 <tr key={String(p.id)} className="border-b border-border/40">
-                  <td className="py-2 pr-4">₹{String(p.totalAmount ?? 0)}</td>
-                  <td className="py-2 pr-4">{p.bookingAmount != null ? `₹${p.bookingAmount}` : "—"}</td>
-                  <td className="py-2 pr-4">₹{String(p.paidAmount ?? 0)}</td>
-                  <td className="py-2 pr-4">₹{String(p.pendingAmount ?? 0)}</td>
                   <td className="py-2 pr-4">
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs">{formatLabel(String(p.status ?? ""))}</span>
+                    <Link href={`/payments/${String(p.id)}`} className="font-medium text-primary hover:underline">
+                      {formatMoney(p.paidAmount)}
+                    </Link>
                   </td>
-                  <td className="py-2">{p.dueDate ? new Date(String(p.dueDate)).toLocaleDateString() : "—"}</td>
+                  <td className="py-2 pr-4">{p.paymentMethod ? formatLabel(String(p.paymentMethod)) : "—"}</td>
+                  <td className="py-2 pr-4">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs">
+                      {formatLabel(String(p.status ?? ""))}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4">
+                    {p.collectedAt ? formatDate(p.collectedAt) : p.createdAt ? formatDate(p.createdAt) : "—"}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {p.proofUrl ? (
+                      <a
+                        href={String(p.proofUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex text-primary hover:underline"
+                        title="View proof"
+                      >
+                        <FileImage className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="py-2">{p.transactionId ? String(p.transactionId) : "—"}</td>
                 </tr>
               ))}
               {!payments.length ? (
-                <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No payments recorded</td></tr>
+                <tr>
+                  <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                    No collections recorded
+                  </td>
+                </tr>
               ) : null}
             </tbody>
           </table>
         </GlassCard>
       )}
 
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add payment">
-        <form onSubmit={(e: FormEvent) => { e.preventDefault(); createMutation.mutate(); }} className="space-y-4">
-          <FormField label="Total amount (₹)">
-            <TextInput value={form.totalAmount} onChange={(v) => setForm((f) => ({ ...f, totalAmount: v }))} type="number" required />
-          </FormField>
-          <FormField label="Booking amount (₹)">
-            <TextInput value={form.bookingAmount} onChange={(v) => setForm((f) => ({ ...f, bookingAmount: v }))} type="number" />
-          </FormField>
-          <FormField label="Paid amount (₹)">
-            <TextInput value={form.paidAmount} onChange={(v) => setForm((f) => ({ ...f, paidAmount: v }))} type="number" />
-          </FormField>
-          <FormField label="Status">
-            <SelectInput
-              value={form.status}
-              onChange={(v) => setForm((f) => ({ ...f, status: v }))}
-              options={PAYMENT_STATUSES.map((s) => ({ value: s, label: formatLabel(s) }))}
-            />
-          </FormField>
-          <FormField label="Due date">
-            <TextInput value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} type="date" />
-          </FormField>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setShowAdd(false)} className="rounded-lg border border-border px-4 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={createMutation.isPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-              {createMutation.isPending ? "Saving…" : "Add payment"}
-            </button>
-          </div>
-        </form>
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Record collection">
+        <PaymentForm
+          defaultValues={{ customerId, status: "PAID" }}
+          onCancel={() => setShowAdd(false)}
+          onSuccess={() => {
+            setShowAdd(false);
+            void queryClient.invalidateQueries({ queryKey: paymentsKey });
+            void queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+          }}
+        />
       </Modal>
     </div>
   );

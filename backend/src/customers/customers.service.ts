@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CustomerStatus,
   CustomerWorkItemCategory,
@@ -138,9 +138,31 @@ export class CustomersService {
   }
 
   async remove(id: string) {
-    const customer = await this.prisma.customer.delete({ where: { id } });
+    const customer = await this.prisma.customer.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const [projects, invoices, payments, supportTickets] = await Promise.all([
+      this.prisma.project.count({ where: { customerId: id } }),
+      this.prisma.invoice.count({ where: { customerId: id } }),
+      this.prisma.payment.count({ where: { customerId: id } }),
+      this.prisma.supportTicket.count({ where: { customerId: id } }),
+    ]);
+
+    const blockers: string[] = [];
+    if (projects > 0) blockers.push(`${projects} project${projects === 1 ? '' : 's'}`);
+    if (invoices > 0) blockers.push(`${invoices} invoice${invoices === 1 ? '' : 's'}`);
+    if (payments > 0) blockers.push(`${payments} payment${payments === 1 ? '' : 's'}`);
+    if (supportTickets > 0) blockers.push(`${supportTickets} support ticket${supportTickets === 1 ? '' : 's'}`);
+
+    if (blockers.length > 0) {
+      throw new ConflictException(
+        `Cannot delete customer: linked records include ${blockers.join(', ')}. Archive as Inactive instead.`,
+      );
+    }
+
+    const deleted = await this.prisma.customer.delete({ where: { id } });
     await this.invalidateDirectoryCache();
-    return customer;
+    return deleted;
   }
 
   async toggleFavorite(userId: string, customerId: string) {

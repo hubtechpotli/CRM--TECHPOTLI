@@ -59,7 +59,7 @@ export function assertCanAssign(role: string) {
 }
 
 export function assertCanDelete(role: string) {
-  if (!isLeadAdmin(role)) {
-    throw new ForbiddenException('Only admins can delete leads');
+  if (role !== UserRole.SUPER_ADMIN) {
+    throw new ForbiddenException('Only super admins can delete leads');
   }
 }
