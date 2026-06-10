@@ -223,42 +223,42 @@ export default function InvoiceDetailPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <GlassCard>
           <h3 className="mb-3 text-sm font-semibold">Summary</h3>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Customer</dt>
-              <dd>{data.customer?.companyName ?? "—"}</dd>
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Customer</dt>
+              <dd className="min-w-0 text-right">{data.customer?.companyName ?? "—"}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Email</dt>
-              <dd>{data.customer?.email ?? "—"}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Email</dt>
+              <dd className="min-w-0 text-right">{data.customer?.email ?? "—"}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Invoice date</dt>
-              <dd>{formatDate(data.invoiceDate)}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Invoice date</dt>
+              <dd className="min-w-0 text-right">{formatDate(data.invoiceDate)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Due date</dt>
-              <dd>{formatDate(data.dueDate)}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Due date</dt>
+              <dd className="min-w-0 text-right">{formatDate(data.dueDate)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Subtotal</dt>
-              <dd>{formatMoney(data.subtotal)}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Subtotal</dt>
+              <dd className="min-w-0 text-right">{formatMoney(data.subtotal)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">GST ({String(data.gstRate ?? 0)}%)</dt>
-              <dd>{formatMoney(data.gstAmount)}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">GST ({String(data.gstRate ?? 0)}%)</dt>
+              <dd className="min-w-0 text-right">{formatMoney(data.gstAmount)}</dd>
             </div>
-            <div className="flex justify-between font-semibold">
-              <dt>Grand total</dt>
-              <dd>{formatMoney(data.grandTotal)}</dd>
+            <div className="flex justify-between gap-x-4 font-semibold">
+              <dt className="shrink-0">Grand total</dt>
+              <dd className="min-w-0 text-right">{formatMoney(data.grandTotal)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Collected</dt>
-              <dd>{formatMoney(paidSoFar)}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Collected</dt>
+              <dd className="min-w-0 text-right">{formatMoney(paidSoFar)}</dd>
             </div>
-            <div className="flex justify-between font-medium">
-              <dt>Balance due</dt>
-              <dd>{formatMoney(remainingBalance)}</dd>
+            <div className="flex justify-between gap-x-4 font-medium">
+              <dt className="shrink-0">Balance due</dt>
+              <dd className="min-w-0 text-right">{formatMoney(remainingBalance)}</dd>
             </div>
           </dl>
           {data.notes ? (

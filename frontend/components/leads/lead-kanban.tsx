@@ -276,15 +276,16 @@ export function LeadKanban({ showSalesPerson = false }: { showSalesPerson?: bool
   }
 
   return (
-    <GlassCard className="relative overflow-hidden p-4">
+    <GlassCard noPadding className="relative">
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background/80 to-transparent" />
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="crm-card-padding">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-2">
           {STATUSES.map((status) => (
             <KanbanColumn
               key={status}
@@ -297,7 +298,8 @@ export function LeadKanban({ showSalesPerson = false }: { showSalesPerson?: bool
         <DragOverlay>
           {activeLead ? <LeadCard lead={activeLead} showSalesPerson={showSalesPerson} /> : null}
         </DragOverlay>
-      </DndContext>
+        </DndContext>
+      </div>
     </GlassCard>
   );
 }

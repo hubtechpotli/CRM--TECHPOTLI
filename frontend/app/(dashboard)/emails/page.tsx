@@ -377,7 +377,7 @@ export default function EmailCenterPage() {
 
         {/* Right: Live preview */}
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <GlassCard className="p-0 overflow-hidden">
+          <GlassCard noPadding className="overflow-hidden">
             <div className="border-b border-border px-4 py-3">
               <h3 className="font-semibold">Live preview</h3>
               <p className="text-xs text-muted-foreground">How your email will appear to the recipient.</p>

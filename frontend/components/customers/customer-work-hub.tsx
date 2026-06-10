@@ -359,7 +359,7 @@ export function CustomerWorkHub({
             const manage = canManage(item);
 
             return (
-              <GlassCard key={item.id} className="overflow-hidden">
+              <GlassCard key={item.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

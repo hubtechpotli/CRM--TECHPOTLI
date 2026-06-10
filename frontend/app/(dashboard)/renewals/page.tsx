@@ -51,7 +51,7 @@ export default function RenewalsPage() {
         </button>
       }
     >
-      <SectionCard noPadding accent={routeColor} className="p-4">
+      <SectionCard accent={routeColor}>
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (

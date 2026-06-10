@@ -66,7 +66,7 @@ export default function ApprovalsPage() {
       {actionError ? (
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600">{actionError}</p>
       ) : null}
-      <SectionCard noPadding accent={routeColor} className="p-4">
+      <SectionCard accent={routeColor}>
         {isLoading ? (
           <ListPageSkeleton rows={5} columns={4} />
         ) : error ? (

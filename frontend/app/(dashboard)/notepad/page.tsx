@@ -135,7 +135,7 @@ export default function NotepadPage() {
       />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <GlassCard className="max-h-[70vh] overflow-y-auto p-2">
+        <GlassCard compact className="max-h-[70vh] overflow-y-auto">
           {isLoading ? (
             <p className="p-4 text-sm text-muted-foreground">Loading…</p>
           ) : notes.length === 0 ? (
@@ -164,7 +164,7 @@ export default function NotepadPage() {
           )}
         </GlassCard>
 
-        <GlassCard className="p-4">
+        <GlassCard>
           {selected ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">

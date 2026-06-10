@@ -162,7 +162,7 @@ export default function PaymentDetailPage() {
         ) : null}
       </div>
 
-      <GlassCard className="p-4">
+      <GlassCard>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted-foreground">Amount</dt>
@@ -206,7 +206,7 @@ export default function PaymentDetailPage() {
       </GlassCard>
 
       {data.proofS3Key ? (
-        <GlassCard className="p-4">
+        <GlassCard>
           <p className="mb-3 text-sm font-medium">Payment proof</p>
           <button
             type="button"

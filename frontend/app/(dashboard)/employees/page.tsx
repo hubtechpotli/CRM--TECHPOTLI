@@ -80,7 +80,7 @@ export default function EmployeesPage() {
       {deleteError ? (
         <p className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
       ) : null}
-      <SectionCard noPadding accent={routeColor} className="p-4">
+      <SectionCard accent={routeColor}>
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
