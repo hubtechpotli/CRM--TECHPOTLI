@@ -2,15 +2,16 @@ import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import {
   IsDateString,
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
 } from 'class-validator';
 
 export class CreatePaymentDto {
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   customerId: string;
 
   @IsNumber()
@@ -21,7 +22,8 @@ export class CreatePaymentDto {
   status: PaymentStatus;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   invoiceId?: string;
 
   @IsOptional()

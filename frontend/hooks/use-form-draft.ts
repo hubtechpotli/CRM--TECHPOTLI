@@ -29,7 +29,7 @@ export function useFormDraft<T extends Record<string, unknown>>({
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw) as T;
-        setForm(parsed);
+        setForm({ ...initial, ...parsed });
         setRestored(true);
         setDirty(true);
       }

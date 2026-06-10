@@ -5,8 +5,8 @@ import {
   IsEnum,
   IsNumber,
   IsOptional,
+  IsNotEmpty,
   IsString,
-  IsUUID,
   Min,
 } from 'class-validator';
 
@@ -58,6 +58,7 @@ export class UpdatePaymentDto {
   verify?: boolean;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   invoiceId?: string;
 }
