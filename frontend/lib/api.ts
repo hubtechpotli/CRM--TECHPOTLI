@@ -66,6 +66,37 @@ api.interceptors.request.use((config) => {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function getApiErrorMessage(error: unknown): string | null {
+  if (!axios.isAxiosError(error)) return null;
+  const data = error.response?.data as { message?: string | string[] } | undefined;
+  const msg = data?.message;
+  if (Array.isArray(msg)) return msg.join(", ");
+  if (typeof msg === "string" && msg) return msg;
+  return null;
+}
+
+function shouldForceLogout(error: AxiosError): boolean {
+  if (error.response?.status === 401) return true;
+  if (error.response?.status === 403) {
+    const msg = getApiErrorMessage(error)?.toLowerCase() ?? "";
+    return (
+      msg.includes("office network") ||
+      msg.includes("network changed") ||
+      msg.includes("browser changed") ||
+      msg.includes("session ended") ||
+      msg.includes("two-factor authentication required")
+    );
+  }
+  return false;
+}
+
+function redirectToLogin() {
+  useAuthStore.getState().logout();
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    window.location.href = "/login";
+  }
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = api
@@ -78,8 +109,7 @@ async function refreshAccessToken(): Promise<string | null> {
         const { accessToken, sessionId, user } = res.data;
         if (accessToken) {
           const store = useAuthStore.getState();
-          const expiresInMs = 14 * 60_000;
-          store.setAccessToken(accessToken, sessionId ?? null, expiresInMs);
+          store.setAccessToken(accessToken, sessionId ?? null);
           if (user) {
             store.setAuth(
               {
@@ -91,14 +121,16 @@ async function refreshAccessToken(): Promise<string | null> {
               },
               accessToken,
               sessionId ?? null,
-              expiresInMs,
             );
           }
           return accessToken;
         }
         return null;
       })
-      .catch(() => null)
+      .catch((error: AxiosError) => {
+        if (!error.response) throw error;
+        return null;
+      })
       .finally(() => {
         refreshPromise = null;
       });
@@ -110,6 +142,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    if (original && shouldForceLogout(error) && original.url?.includes("/auth/refresh")) {
+      redirectToLogin();
+      return Promise.reject(error);
+    }
+
     if (
       error.response?.status === 401 &&
       original &&
@@ -124,11 +162,14 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${token}`;
         return api(original);
       }
-      useAuthStore.getState().logout();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
-      }
+      redirectToLogin();
+      return Promise.reject(error);
     }
+
+    if (original && !original._retry && error.response?.status === 403 && shouldForceLogout(error)) {
+      redirectToLogin();
+    }
+
     return Promise.reject(error);
   },
 );

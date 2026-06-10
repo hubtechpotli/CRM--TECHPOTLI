@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { refreshAccessToken } from "@/lib/api";
+import { isJwtExpired } from "@/lib/jwt";
+import { useSessionRefresh } from "@/hooks/use-session-refresh";
 import { AppShellSkeleton } from "@/components/ui/skeleton";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -14,8 +16,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const pending2FA = useAuthStore((s) => s.pending2FA);
   const pending2FASetup = useAuthStore((s) => s.pending2FASetup);
   const restoreSessionToken = useAuthStore((s) => s.restoreSessionToken);
+  const logout = useAuthStore((s) => s.logout);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [hydrated, setHydrated] = useState(false);
+
+  useSessionRefresh();
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -30,28 +35,32 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
     (async () => {
-      const cachedToken = restoreSessionToken();
-      if (cachedToken) {
-        if (!cancelled) setBootstrapping(false);
-        refreshAccessToken().catch(() => undefined);
-        return;
+      const store = useAuthStore.getState();
+      let token = restoreSessionToken();
+
+      try {
+        if (!token || isJwtExpired(token)) {
+          token = await refreshAccessToken();
+        } else if (isJwtExpired(token, 3 * 60_000)) {
+          void refreshAccessToken();
+        }
+      } catch {
+        token = restoreSessionToken();
       }
 
-      if (!useAuthStore.getState().accessToken) {
-        const token = await refreshAccessToken();
-        if (cancelled) return;
-        if (!token) {
-          setBootstrapping(false);
-          return;
-        }
+      if (cancelled) return;
+
+      if (!token && store.user) {
+        logout();
       }
-      if (!cancelled) setBootstrapping(false);
+
+      setBootstrapping(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [hydrated, accessToken, restoreSessionToken]);
+  }, [hydrated, restoreSessionToken, logout]);
 
   useEffect(() => {
     if (bootstrapping) return;

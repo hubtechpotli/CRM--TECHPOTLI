@@ -16,6 +16,7 @@ import { RedisService } from '../redis/redis.service';
 import { SessionService } from '../redis/session.service';
 import { EncryptionService } from '../common/encryption.service';
 import { IpAccessService } from '../common/services/ip-access.service';
+import { assertSessionClientMatches } from '../common/utils/session-client.util';
 import { parseUserAgent } from '../common/utils/ip.util';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -304,6 +305,12 @@ export class AuthService {
         if (graceSession && graceSession.user.isActive && graceSession.expiresAt > new Date()) {
           const match = await bcrypt.compare(grace.refreshToken, graceSession.refreshTokenHash);
           if (match) {
+            try {
+              assertSessionClientMatches(graceSession, ip, userAgent);
+            } catch (err) {
+              await this.revokeSessionRecord(graceSession.id, graceSession.userId, lookup);
+              throw err;
+            }
             return this.tokensFromSession(graceSession.user, graceSession.id, grace.refreshToken);
           }
         }
@@ -324,6 +331,13 @@ export class AuthService {
     const match = await bcrypt.compare(refreshToken, session.refreshTokenHash);
     if (!match || !session.user.isActive) {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    try {
+      assertSessionClientMatches(session, ip, userAgent);
+    } catch (err) {
+      await this.revokeSessionRecord(session.id, session.userId, lookup);
+      throw err;
     }
 
     await this.redis.set(`refresh:revoked:${lookup}`, session.userId, REFRESH_TTL);
@@ -483,6 +497,14 @@ export class AuthService {
         mustChangePassword: user.mustChangePassword,
       },
     };
+  }
+
+  private async revokeSessionRecord(sessionId: string, userId: string, lookup?: string) {
+    if (lookup) {
+      await this.redis.set(`refresh:revoked:${lookup}`, userId, REFRESH_TTL);
+    }
+    await this.prisma.userSession.deleteMany({ where: { id: sessionId, userId } });
+    await this.sessions.revokeSession(sessionId, userId);
   }
 
   private async revokeAllSessionsForUser(userId: string) {
