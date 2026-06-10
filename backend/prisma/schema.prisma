@@ -1435,6 +1435,56 @@ model DashboardSnapshot {
   updatedAt DateTime @updatedAt
 }
 
+model DailyRevenueSnapshot {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  revenue      Decimal  @default(0) @db.Decimal(14, 2)
+  paymentCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([date])
+  @@index([date(sort: Desc)])
+}
+
+model MonthlyRevenueSnapshot {
+  id           String   @id @default(cuid())
+  year         Int
+  month        Int
+  revenue      Decimal  @default(0) @db.Decimal(14, 2)
+  paymentCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([year, month])
+  @@index([year, month(sort: Desc)])
+}
+
+model MrrSnapshot {
+  id             String   @id @default(cuid())
+  snapshotDate   DateTime @db.Date
+  mrr            Decimal  @default(0) @db.Decimal(14, 2)
+  activeServices Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([snapshotDate])
+}
+
+model EmployeePerformanceSnapshot {
+  id             String   @id @default(cuid())
+  snapshotDate   DateTime @db.Date
+  userId         String
+  name           String
+  email          String
+  role           String
+  leads          Int      @default(0)
+  customers      Int      @default(0)
+  projects       Int      @default(0)
+  convertedLeads Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([snapshotDate, userId])
+  @@index([userId])
+}
+
 // ─── WORKFLOW AUTOMATION ─────────────────────────────────────────────────────
 
 model WorkflowRule {

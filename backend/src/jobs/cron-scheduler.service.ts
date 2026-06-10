@@ -14,6 +14,7 @@ export class CronSchedulerService implements OnModuleInit {
       { name: 'eod-lead-update-reminder', pattern: '30 17 * * *' },
       { name: 'work-order-escalation', pattern: '*/30 * * * *' },
       { name: 'quotation-expiry-check', pattern: '0 9 * * *' },
+      { name: 'dashboard-snapshot', pattern: '*/5 * * * *' },
     ];
     for (const j of jobs) {
       try {

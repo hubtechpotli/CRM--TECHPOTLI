@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
 import { LeadStatus, PaymentStatus, QuotationStatus, RenewalStatus, WorkOrderStatus } from '@prisma/client';
+import { SnapshotRefreshService } from '../reports/snapshot-refresh.service';
 
 @Processor('cron')
 export class CronProcessor extends WorkerHost {
@@ -14,6 +15,7 @@ export class CronProcessor extends WorkerHost {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private mail: MailService,
+    private snapshots: SnapshotRefreshService,
   ) {
     super();
   }
@@ -32,6 +34,8 @@ export class CronProcessor extends WorkerHost {
         return this.workOrderEscalation();
       case 'quotation-expiry-check':
         return this.quotationExpiryCheck();
+      case 'dashboard-snapshot':
+        return this.snapshots.refreshAll();
     }
   }
 
