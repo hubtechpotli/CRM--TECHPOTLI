@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
 import { useAuthStore } from "@/store/auth-store";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
 
 export default function Setup2faPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const setupToken = useAuthStore((s) => s.setupToken);
   const setAuth = useAuthStore((s) => s.setAuth);
   const setPending2FASetup = useAuthStore((s) => s.setPending2FASetup);
@@ -98,6 +101,7 @@ export default function Setup2faPage() {
           type="button"
           onClick={() => {
             const u = useAuthStore.getState().user;
+            void prefetchAfterAuth(queryClient, u?.role);
             if (u?.mustChangePassword) router.replace("/security/change-password");
             else router.replace("/dashboard");
           }}

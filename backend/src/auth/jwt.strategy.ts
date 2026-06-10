@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionService } from '../redis/session.service';
-import { assertSessionClientMatches } from '../common/utils/session-client.util';
+import { buildSessionClientUpdate } from '../common/utils/session-client.util';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -56,7 +56,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       req.ip ||
       '127.0.0.1';
     const userAgent = (req.headers['user-agent'] as string) || 'unknown';
-    assertSessionClientMatches(session, ip, userAgent);
 
     const valid = await this.sessions.isSessionValid(payload.sid, payload.sub);
     if (!valid) throw new UnauthorizedException('Session expired');
@@ -66,7 +65,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!recentlyActive) {
       await this.prisma.userSession.update({
         where: { id: payload.sid },
-        data: { lastActiveAt: new Date() },
+        data: buildSessionClientUpdate(ip, userAgent),
       });
       await this.sessions.setRaw(activityKey, '1', 300);
     }

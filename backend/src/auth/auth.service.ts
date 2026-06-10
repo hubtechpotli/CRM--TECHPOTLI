@@ -16,7 +16,7 @@ import { RedisService } from '../redis/redis.service';
 import { SessionService } from '../redis/session.service';
 import { EncryptionService } from '../common/encryption.service';
 import { IpAccessService } from '../common/services/ip-access.service';
-import { assertSessionClientMatches } from '../common/utils/session-client.util';
+import { buildSessionClientUpdate } from '../common/utils/session-client.util';
 import { parseUserAgent } from '../common/utils/ip.util';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -305,12 +305,10 @@ export class AuthService {
         if (graceSession && graceSession.user.isActive && graceSession.expiresAt > new Date()) {
           const match = await bcrypt.compare(grace.refreshToken, graceSession.refreshTokenHash);
           if (match) {
-            try {
-              assertSessionClientMatches(graceSession, ip, userAgent);
-            } catch (err) {
-              await this.revokeSessionRecord(graceSession.id, graceSession.userId, lookup);
-              throw err;
-            }
+            await this.prisma.userSession.update({
+              where: { id: graceSession.id },
+              data: buildSessionClientUpdate(ip, userAgent),
+            });
             return this.tokensFromSession(graceSession.user, graceSession.id, grace.refreshToken);
           }
         }
@@ -331,13 +329,6 @@ export class AuthService {
     const match = await bcrypt.compare(refreshToken, session.refreshTokenHash);
     if (!match || !session.user.isActive) {
       throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    try {
-      assertSessionClientMatches(session, ip, userAgent);
-    } catch (err) {
-      await this.revokeSessionRecord(session.id, session.userId, lookup);
-      throw err;
     }
 
     await this.redis.set(`refresh:revoked:${lookup}`, session.userId, REFRESH_TTL);
@@ -387,6 +378,7 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash: hash, mustChangePassword: false },
     });
+    await this.revokeAllSessionsForUser(userId);
     return { success: true };
   }
 

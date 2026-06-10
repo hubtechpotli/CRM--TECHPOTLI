@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider, keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "sonner";
+import { queryRetryDelay, shouldRetryQuery } from "@/lib/query-retry";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -14,6 +15,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             gcTime: 5 * 60_000,
             refetchOnWindowFocus: false,
             placeholderData: keepPreviousData,
+            retry: shouldRetryQuery,
+            retryDelay: queryRetryDelay,
           },
           mutations: {
             retry: 1,
