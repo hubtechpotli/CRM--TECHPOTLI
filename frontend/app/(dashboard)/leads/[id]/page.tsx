@@ -269,8 +269,8 @@ export default function LeadDetailPage() {
     <div className="space-y-6">
       <DetailBackLink />
 
-      <GlassCard className="overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-5">
+      <GlassCard noPadding>
+        <div className="flex flex-wrap items-start justify-between gap-4 p-5 md:px-6">
           <div className="flex items-start gap-4">
             <CompanyAvatar name={String(data.companyName ?? "?")} className="h-14 w-14 text-lg" />
             <div>

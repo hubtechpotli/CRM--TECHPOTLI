@@ -157,17 +157,17 @@ export default function PaymentsPage() {
 
       {adminView && summary ? (
         <div className="grid gap-4 sm:grid-cols-3">
-          <GlassCard className="p-4">
+          <GlassCard>
             <p className="text-xs text-muted-foreground">Today&apos;s collection</p>
             <p className="mt-1 text-2xl font-bold">{formatMoney(summary.today.amount)}</p>
             <p className="text-xs text-muted-foreground">{summary.today.count} payments</p>
           </GlassCard>
-          <GlassCard className="p-4">
+          <GlassCard>
             <p className="text-xs text-muted-foreground">This month</p>
             <p className="mt-1 text-2xl font-bold">{formatMoney(summary.month.amount)}</p>
             <p className="text-xs text-muted-foreground">{summary.month.count} payments</p>
           </GlassCard>
-          <GlassCard className="p-4">
+          <GlassCard>
             <p className="text-xs text-muted-foreground">Top collectors (month)</p>
             <ul className="mt-2 space-y-1 text-sm">
               {summary.byUser.slice(0, 3).map((u) => (
@@ -187,7 +187,7 @@ export default function PaymentsPage() {
         </div>
       ) : null}
 
-      <GlassCard className="space-y-4 p-4">
+      <GlassCard className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

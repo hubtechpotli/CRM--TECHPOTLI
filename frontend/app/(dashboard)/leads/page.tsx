@@ -212,7 +212,7 @@ export default function LeadsPage() {
 
       {view === "list" ? (
         <SectionCard noPadding accent={routeColor}>
-          <div className="space-y-4 border-b border-border/50 p-5">
+          <div className="space-y-4 border-b border-border/50 p-5 md:px-6">
             <StatusTabs
               tabs={STATUS_TABS}
               value={statusFilter}

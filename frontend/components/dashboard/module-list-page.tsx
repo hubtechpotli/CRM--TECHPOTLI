@@ -78,9 +78,9 @@ export function ModuleListPage<T extends Record<string, unknown>>({
     <CrmPageShell title={title} description={description} hideHeader={hideHeader}>
       <SectionCard noPadding accent={routeColor}>
         {listHeader ? (
-          <div className="border-b border-border/60 px-4 py-2.5">{listHeader}</div>
+          <div className="border-b border-border/60 px-6 py-3">{listHeader}</div>
         ) : null}
-        <div className="p-4">
+        <div className="crm-card-padding">
           {error ? (
             <div className="py-8 text-center">
               <p className="text-sm text-red-500">

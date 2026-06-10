@@ -53,7 +53,7 @@ export function CustomerDrawer({
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : data ? (
             <div className="space-y-4">
-              <GlassCard className="p-4">
+              <GlassCard>
                 <p className="text-lg font-semibold">{String(data.companyName ?? "—")}</p>
                 <p className="text-sm text-muted-foreground">{String(data.ownerName ?? "")}</p>
                 <div className="mt-3 space-y-1 text-sm">

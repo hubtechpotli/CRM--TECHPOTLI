@@ -22,6 +22,7 @@ export function SectionCard({
   actionHref?: string;
   children: React.ReactNode;
   className?: string;
+  /** Inner content must use at least p-5 md:px-6 */
   noPadding?: boolean;
   compact?: boolean;
   headerClassName?: string;
@@ -32,7 +33,7 @@ export function SectionCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md",
+        "rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md",
         color?.border ?? "border-border",
         className,
       )}
@@ -47,7 +48,7 @@ export function SectionCard({
             "flex items-center justify-between gap-2 border-b",
             color?.border ?? "border-border/50",
             color?.light,
-            compact ? "px-3 py-2" : "px-5 py-4",
+            compact ? "px-4 py-3" : "px-6 py-4",
             headerClassName,
           )}
         >
@@ -89,7 +90,13 @@ export function SectionCard({
           ) : null}
         </div>
       ) : null}
-      <div className={noPadding ? undefined : compact ? "p-3" : "p-5"}>{children}</div>
+      <div
+        className={
+          noPadding ? undefined : compact ? "crm-card-padding-compact" : "crm-card-padding"
+        }
+      >
+        {children}
+      </div>
     </div>
   );
 }

@@ -202,7 +202,7 @@ export function ProjectKanban() {
   }
 
   return (
-    <SectionCard noPadding className="p-4">
+    <SectionCard>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-2">
           {PROJECT_STATUSES.map((status) => (

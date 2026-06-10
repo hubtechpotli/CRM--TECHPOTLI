@@ -105,19 +105,21 @@ export default function QuotationDetailPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <GlassCard>
           <h3 className="mb-3 text-sm font-semibold">Client</h3>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Name</dt>
-              <dd>{String(data.clientName ?? data.lead?.companyName ?? data.customer?.companyName ?? "—")}</dd>
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Name</dt>
+              <dd className="min-w-0 text-right">
+                {String(data.clientName ?? data.lead?.companyName ?? data.customer?.companyName ?? "—")}
+              </dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Email</dt>
-              <dd>{String(data.clientEmail ?? "—")}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Email</dt>
+              <dd className="min-w-0 text-right">{String(data.clientEmail ?? "—")}</dd>
             </div>
             {data.lead?.id ? (
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Lead</dt>
-                <dd>
+              <div className="flex justify-between gap-x-4">
+                <dt className="shrink-0 text-muted-foreground">Lead</dt>
+                <dd className="min-w-0 text-right">
                   <Link href={`/leads/${data.lead.id}`} className="text-primary hover:underline">
                     {data.lead.companyName}
                   </Link>
@@ -125,45 +127,45 @@ export default function QuotationDetailPage() {
               </div>
             ) : null}
             {data.customer?.id ? (
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Customer</dt>
-                <dd>
+              <div className="flex justify-between gap-x-4">
+                <dt className="shrink-0 text-muted-foreground">Customer</dt>
+                <dd className="min-w-0 text-right">
                   <Link href={`/customers/${data.customer.id}`} className="text-primary hover:underline">
                     {data.customer.companyName}
                   </Link>
                 </dd>
               </div>
             ) : null}
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Valid until</dt>
-              <dd>{data.validUntil ? formatDate(data.validUntil) : "—"}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Valid until</dt>
+              <dd className="min-w-0 text-right">{data.validUntil ? formatDate(data.validUntil) : "—"}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Created by</dt>
-              <dd>{data.createdBy?.name ?? "—"}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Created by</dt>
+              <dd className="min-w-0 text-right">{data.createdBy?.name ?? "—"}</dd>
             </div>
           </dl>
         </GlassCard>
 
         <GlassCard>
           <h3 className="mb-3 text-sm font-semibold">Totals</h3>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Subtotal</dt>
-              <dd>₹{String(data.subtotal ?? 0)}</dd>
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">Subtotal</dt>
+              <dd className="min-w-0 text-right">₹{String(data.subtotal ?? 0)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">GST</dt>
-              <dd>₹{String(data.gstAmount ?? 0)}</dd>
+            <div className="flex justify-between gap-x-4">
+              <dt className="shrink-0 text-muted-foreground">GST</dt>
+              <dd className="min-w-0 text-right">₹{String(data.gstAmount ?? 0)}</dd>
             </div>
-            <div className="flex justify-between font-semibold">
-              <dt>Grand total</dt>
-              <dd>₹{String(data.grandTotal ?? 0)}</dd>
+            <div className="flex justify-between gap-x-4 font-semibold">
+              <dt className="shrink-0">Grand total</dt>
+              <dd className="min-w-0 text-right">₹{String(data.grandTotal ?? 0)}</dd>
             </div>
             {data.approvedAt ? (
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Approved</dt>
-                <dd>{formatDateTime(data.approvedAt)}</dd>
+              <div className="flex justify-between gap-x-4">
+                <dt className="shrink-0 text-muted-foreground">Approved</dt>
+                <dd className="min-w-0 text-right">{formatDateTime(data.approvedAt)}</dd>
               </div>
             ) : null}
           </dl>

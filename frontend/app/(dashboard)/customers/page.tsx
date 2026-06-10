@@ -154,7 +154,7 @@ export default function CustomersPage() {
       </div>
 
       <SectionCard title="All customers" noPadding accent={routeColor}>
-        <div className="space-y-4 border-b border-border/50 px-4 py-4 sm:px-5">
+        <div className="space-y-4 border-b border-border/50 p-5 md:px-6">
           <StatusTabs tabs={STATUS_TABS} value={statusFilter} onChange={setStatusFilter} accent={routeColor} />
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

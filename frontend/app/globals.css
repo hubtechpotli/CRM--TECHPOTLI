@@ -65,6 +65,20 @@ body {
 }
 
 /* Shared CRM page patterns */
+.crm-card-padding {
+  padding: 1.25rem 1.5rem;
+}
+
+.crm-card-padding-compact {
+  padding: 0.75rem 1rem;
+}
+
+@media (min-width: 768px) {
+  .crm-card-padding {
+    padding: 1.5rem;
+  }
+}
+
 .crm-page {
   animation: crm-fade-in 0.18s ease-out;
 }

@@ -123,7 +123,7 @@ export default function ProjectsPage() {
 
       {view === "kanban" ? <ProjectKanban /> : (
         <SectionCard noPadding accent={routeColor}>
-          <div className="border-b border-border/50 p-5">
+          <div className="border-b border-border/50 p-5 md:px-6">
             <StatusTabs tabs={STATUS_TABS} value={statusFilter} onChange={setStatusFilter} accent={routeColor} />
           </div>
           {error ? (
