@@ -8,6 +8,7 @@ import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CardSkeleton } from "@/components/ui/skeleton";
+import { isTempId } from "@/lib/optimistic-mutation";
 
 type RenewalDetail = Record<string, unknown> & {
   customer?: { companyName?: string; phone?: string; email?: string };
@@ -23,7 +24,12 @@ export default function RenewalDetailPage() {
       const res = await api.get<RenewalDetail>(`/renewals/${id}`);
       return res.data;
     },
+    enabled: !isTempId(id),
   });
+
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving new renewal…</p>;
+  }
 
   if (isLoading) {
     return <CardSkeleton className="h-48" />;

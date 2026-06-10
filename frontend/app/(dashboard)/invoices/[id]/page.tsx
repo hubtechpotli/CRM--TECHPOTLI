@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { isTempId } from "@/lib/optimistic-mutation";
 
 type LineItem = { name: string; qty: number; rate: number; amount: number };
 
@@ -28,6 +29,7 @@ export default function InvoiceDetailPage() {
       const res = await api.get<InvoiceDetail>(`/invoices/${id}`);
       return res.data;
     },
+    enabled: !isTempId(id),
   });
 
   const sendMutation = useMutation({
@@ -50,6 +52,10 @@ export default function InvoiceDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
     },
   });
+
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving new invoice…</p>;
+  }
 
   if (isLoading) {
     return <div className="space-y-6"><div className="h-8 w-48 animate-pulse rounded bg-muted" /><div className="h-64 animate-pulse rounded-2xl border border-border/60 bg-card" /></div>;

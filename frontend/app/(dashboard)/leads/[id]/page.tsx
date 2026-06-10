@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
-import { appendDetailListItem, createTempId, patchDetailItem } from "@/lib/optimistic-mutation";
+import { appendDetailListItem, createTempId, isTempId, patchDetailItem } from "@/lib/optimistic-mutation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import {
@@ -97,6 +97,7 @@ export default function LeadDetailPage() {
       const res = await api.get<LeadDetail>(`/leads/${id}`);
       return res.data;
     },
+    enabled: !isTempId(id),
   });
 
   useEffect(() => {
@@ -214,6 +215,10 @@ export default function LeadDetailPage() {
       router.push(`/customers/${customer.id}?newProject=1`);
     },
   });
+
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving new lead…</p>;
+  }
 
   if (isLoading) return <LeadDetailSkeleton />;
 

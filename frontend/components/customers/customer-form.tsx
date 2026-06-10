@@ -155,7 +155,6 @@ export function CustomerForm({
       if (isEdit) {
         const customerId = String(customer!.id);
         patchDetailItem(queryClient, ["customer", customerId], body);
-        onSuccess?.({ id: customerId, ...body });
         return {};
       }
       const tempId = createTempId();
@@ -171,6 +170,8 @@ export function CustomerForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
         onSuccess?.(data as Record<string, unknown>);
       }
     },

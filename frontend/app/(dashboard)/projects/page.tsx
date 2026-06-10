@@ -26,6 +26,7 @@ const ProjectKanban = dynamic(() => import("@/components/projects/project-kanban
 });
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
+import { isTempId } from "@/lib/optimistic-mutation";
 
 type ProjectRow = Record<string, unknown> & {
   customer?: { companyName?: string };
@@ -122,10 +123,14 @@ export default function ProjectsPage() {
             <PremiumDataTable
               loading={isLoading}
               rows={rows}
-              onRowClick={(row) => router.push(`/projects/${row.id}`)}
-              rowActions={(row) => [
-                { label: "Open project", onClick: () => router.push(`/projects/${row.id}`) },
-              ]}
+              onRowClick={(row) => {
+                if (!isTempId(String(row.id))) router.push(`/projects/${row.id}`);
+              }}
+              rowActions={(row) =>
+                isTempId(String(row.id))
+                  ? []
+                  : [{ label: "Open project", onClick: () => router.push(`/projects/${row.id}`) }]
+              }
               columns={[
                 {
                   key: "name",
@@ -195,7 +200,8 @@ export default function ProjectsPage() {
           onCancel={() => setShowNewProject(false)}
           onSuccess={(project) => {
             setShowNewProject(false);
-            if (project.id) router.push(`/projects/${project.id}`);
+            const projectId = String(project.id ?? "");
+            if (projectId && !isTempId(projectId)) router.push(`/projects/${projectId}`);
           }}
         />
       </Modal>

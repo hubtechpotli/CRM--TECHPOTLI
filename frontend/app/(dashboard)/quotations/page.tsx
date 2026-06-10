@@ -7,6 +7,7 @@ import { ModuleListPage } from "@/components/dashboard/module-list-page";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Modal } from "@/components/ui/modal";
 import { QuotationForm } from "@/components/quotations/quotation-form";
+import { isTempId } from "@/lib/optimistic-mutation";
 
 type QuotationRow = Record<string, unknown>;
 
@@ -75,7 +76,8 @@ export default function QuotationsPage() {
           onCancel={() => setShowNew(false)}
           onSuccess={(data) => {
             setShowNew(false);
-            if (data.id) router.push(`/quotations/${data.id}`);
+            const id = String(data.id ?? "");
+            if (id && !isTempId(id)) router.push(`/quotations/${id}`);
           }}
         />
       </Modal>

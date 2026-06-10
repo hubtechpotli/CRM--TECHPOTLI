@@ -30,6 +30,7 @@ const LeadKanban = dynamic(() => import("@/components/leads/lead-kanban").then((
   ),
 });
 import { LeadForm } from "@/components/leads/lead-form";
+import { isTempId } from "@/lib/optimistic-mutation";
 import {
   CompanyAvatar,
   LeadConversionBadge,
@@ -232,10 +233,14 @@ export default function LeadsPage() {
           <PremiumDataTable
             loading={isLoading}
             rows={rows}
-            onRowClick={(row) => router.push(`/leads/${row.id}`)}
-            rowActions={(row) => [
-              { label: "View lead", onClick: () => router.push(`/leads/${row.id}`) },
-            ]}
+            onRowClick={(row) => {
+              if (!isTempId(String(row.id))) router.push(`/leads/${row.id}`);
+            }}
+            rowActions={(row) =>
+              isTempId(String(row.id))
+                ? []
+                : [{ label: "View lead", onClick: () => router.push(`/leads/${row.id}`) }]
+            }
             columns={[
               {
                 key: "company",
@@ -360,7 +365,8 @@ export default function LeadsPage() {
           onCancel={() => setShowNewLead(false)}
           onSuccess={(data) => {
             setShowNewLead(false);
-            if (data.id) router.push(`/leads/${data.id}`);
+            const id = String(data.id ?? "");
+            if (id && !isTempId(id)) router.push(`/leads/${id}`);
           }}
         />
       </Modal>

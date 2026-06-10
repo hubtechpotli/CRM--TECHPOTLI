@@ -59,7 +59,6 @@ export function RenewalForm({
         renewalDate: form.renewalDate,
       };
       appendToMatchingLists(queryClient, ["renewals"], optimistic);
-      onSuccess?.(optimistic);
       return { tempId };
     },
     onSuccess: (data, _vars, context) => {
@@ -70,6 +69,9 @@ export function RenewalForm({
           context.tempId,
           data as { id: string },
         );
+      }
+      if (data && typeof data === "object") {
+        onSuccess?.(data as Record<string, unknown>);
       }
     },
     onError: (err) => {
