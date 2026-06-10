@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable } from "@/components/dashboard/data-table";
@@ -24,6 +25,7 @@ type ExpenseRow = Record<string, unknown> & {
 export default function ExpensesPage() {
   const queryClient = useQueryClient();
   const role = useAuthStore((s) => s.user?.role);
+  const { authReady } = useAuthReady();
   const superAdmin = isSuperAdmin(role);
   const [showNew, setShowNew] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -34,6 +36,7 @@ export default function ExpensesPage() {
       const res = await api.get<ExpenseRow[]>("/expenses");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const approveMutation = useOptimisticMutation({

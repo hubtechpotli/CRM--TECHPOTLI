@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { formatDate, formatLabel } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -12,12 +13,15 @@ import { ListPageSkeleton } from "@/components/ui/skeleton";
 type TicketRow = Record<string, unknown>;
 
 export default function SupportPage() {
+  const { authReady } = useAuthReady();
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["support-tickets"],
     queryFn: async () => {
       const res = await api.get<TicketRow[]>("/support/tickets");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const rows = Array.isArray(data) ? data : [];

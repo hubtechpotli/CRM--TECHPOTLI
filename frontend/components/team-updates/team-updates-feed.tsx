@@ -21,8 +21,8 @@ import { api } from "@/lib/api";
 import { formatDateTime, formatLabel } from "@/lib/format";
 import { type GlobalWorkItem } from "@/lib/team-updates";
 import { useAssignees } from "@/hooks/use-users";
-import { useAuthStore } from "@/store/auth-store";
-import { isAdmin } from "@/lib/roles";
+import { useAuthReady } from "@/hooks/use-auth-ready";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
@@ -64,10 +64,39 @@ function mutationError(err: unknown) {
     : "Action failed";
 }
 
+type CreateWorkItemPayload = {
+  customerId: string;
+  title: string;
+  description?: string;
+  category: string;
+  assignedToId?: string;
+  projectId?: string;
+  dueDate?: string;
+};
+
+const emptyForm = {
+  customerId: "",
+  title: "",
+  description: "",
+  category: "GENERAL",
+  assignedToId: "",
+  projectId: "",
+  dueDate: "",
+};
+
+function teamInvalidateKeys(customerId?: string) {
+  const keys: (readonly string[])[] = [["team-updates-feed"], ["team-updates-summary"]];
+  if (customerId) keys.push(["customer-work-items", customerId]);
+  return keys;
+}
+
+function resolveCustomerId(item: GlobalWorkItem): string {
+  return String(item.customerId ?? item.customer?.id ?? "").trim();
+}
+
 export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; take?: number }) {
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
-  const admin = isAdmin(user?.role);
+  const { authReady } = useAuthReady();
   const { data: assignees = [] } = useAssignees();
 
   const [statusFilter, setStatusFilter] = useState("open");
@@ -107,6 +136,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       const res = await api.get<GlobalWorkItem[]>("/team-updates/feed", { params: feedParams });
       return Array.isArray(res.data) ? res.data : [];
     },
+    enabled: authReady,
   });
 
   const { data: customers = [] } = useQuery({
@@ -117,7 +147,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       );
       return data.items;
     },
-    enabled: showForm && !compact,
+    enabled: authReady && showForm && !compact,
   });
 
   const { data: projects = [] } = useQuery({
@@ -131,47 +161,33 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
     enabled: showForm && !compact && Boolean(form.customerId),
   });
 
-  const teamInvalidateKeys = [
-    ["team-updates-feed"],
-    ["team-updates-summary"],
-    ["customer-work-items"],
-    ["customers-directory"],
-  ] as const;
-
   const createMutation = useOptimisticMutation({
-    mutationFn: async () => {
-      const res = await api.post(`/customers/${form.customerId}/work-items`, {
-        title: form.title.trim(),
-        description: form.description.trim() || undefined,
-        category: form.category,
-        assignedToId: form.assignedToId || undefined,
-        projectId: form.projectId || undefined,
-        dueDate: form.dueDate || undefined,
+    mutationFn: async (payload: CreateWorkItemPayload) => {
+      const res = await api.post(`/customers/${payload.customerId}/work-items`, {
+        title: payload.title,
+        description: payload.description,
+        category: payload.category,
+        assignedToId: payload.assignedToId,
+        projectId: payload.projectId,
+        dueDate: payload.dueDate,
       });
       return res.data;
     },
     snapshotKeys: [queryKey],
-    invalidateKeys: [...teamInvalidateKeys],
-    onMutate: () => {
+    invalidateKeys: (payload) => teamInvalidateKeys(payload.customerId),
+    onMutate: (payload) => {
       appendListItem(queryClient, queryKey, {
         id: createTempId(),
-        title: form.title.trim(),
+        title: payload.title,
         status: "OPEN",
-        category: form.category,
-        customer: { id: form.customerId },
+        category: payload.category,
+        customerId: payload.customerId,
+        customer: { id: payload.customerId },
         createdAt: new Date().toISOString(),
       });
       setShowForm(false);
       setFormError(null);
-      setForm({
-        customerId: "",
-        title: "",
-        description: "",
-        category: "GENERAL",
-        assignedToId: "",
-        projectId: "",
-        dueDate: "",
-      });
+      setForm(emptyForm);
     },
     onError: (err) => setFormError(mutationError(err)),
   });
@@ -192,7 +208,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       return res.data;
     },
     snapshotKeys: [queryKey],
-    invalidateKeys: [...teamInvalidateKeys],
+    invalidateKeys: ({ customerId }) => teamInvalidateKeys(customerId),
     onMutate: ({ itemId, status }) => {
       patchListItem(queryClient, queryKey, itemId, { status });
     },
@@ -204,14 +220,16 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       return res.data;
     },
     snapshotKeys: [queryKey],
-    invalidateKeys: [...teamInvalidateKeys],
+    invalidateKeys: ({ customerId }) => teamInvalidateKeys(customerId),
     onMutate: ({ itemId }) => {
       setUpdateText((prev) => ({ ...prev, [itemId]: "" }));
     },
   });
 
-  const canManage = (item: GlobalWorkItem) =>
-    admin || item.createdBy?.id === user?.id || item.assignedTo?.id === user?.id;
+  const canManage = (item: GlobalWorkItem) => {
+    const s = String(item.status ?? "OPEN");
+    return s !== "COMPLETED" && s !== "CANCELLED";
+  };
 
   const displayItems = compact ? items.slice(0, take ?? 5) : items;
 
@@ -226,8 +244,34 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
       setFormError("Title is required");
       return;
     }
-    createMutation.mutate();
+    createMutation.mutate({
+      customerId: form.customerId,
+      title: form.title.trim(),
+      description: form.description.trim() || undefined,
+      category: form.category,
+      assignedToId: form.assignedToId || undefined,
+      projectId: form.projectId || undefined,
+      dueDate: form.dueDate || undefined,
+    });
   };
+
+  function mutateStatus(item: GlobalWorkItem, status: string, note?: string) {
+    const customerId = resolveCustomerId(item);
+    if (!customerId) {
+      toast.error("Missing customer for this work item. Refresh the page.");
+      return;
+    }
+    statusMutation.mutate({ customerId, itemId: item.id, status, note });
+  }
+
+  function mutateUpdate(item: GlobalWorkItem, body: string) {
+    const customerId = resolveCustomerId(item);
+    if (!customerId) {
+      toast.error("Missing customer for this work item. Refresh the page.");
+      return;
+    }
+    updateMutation.mutate({ customerId, itemId: item.id, body });
+  }
 
   return (
     <div className="space-y-4">
@@ -350,7 +394,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
             const updates = item.updates ?? [];
             const status = String(item.status ?? "OPEN");
             const manage = canManage(item);
-            const customerId = String(item.customerId ?? item.customer?.id ?? "");
+            const customerId = resolveCustomerId(item);
 
             return (
               <GlassCard key={item.id}>
@@ -419,14 +463,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
                     {status === "OPEN" ? (
                       <button
                         type="button"
-                        onClick={() =>
-                          statusMutation.mutate({
-                            customerId,
-                            itemId: item.id,
-                            status: "IN_PROGRESS",
-                            note: "Started working on this",
-                          })
-                        }
+                        onClick={() => mutateStatus(item, "IN_PROGRESS", "Started working on this")}
                         className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted/50"
                       >
                         <PlayCircle className="h-3.5 w-3.5" />
@@ -435,14 +472,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
                     ) : null}
                     <button
                       type="button"
-                      onClick={() =>
-                        statusMutation.mutate({
-                          customerId,
-                          itemId: item.id,
-                          status: "COMPLETED",
-                          note: "Marked as completed",
-                        })
-                      }
+                      onClick={() => mutateStatus(item, "COMPLETED", "Marked as completed")}
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -464,19 +494,25 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
 
                 {!compact && isOpen ? (
                   <div className="mt-3 space-y-2 border-t border-border/40 pt-3">
-                    {updates.map((u) => (
-                      <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{(u.author as { name?: string })?.name ?? "Team"}</span>
-                          <span>{formatDateTime(u.createdAt)}</span>
+                    {updates.map((u) => {
+                      const authorName = (u.author as { name?: string })?.name ?? "Team member";
+                      return (
+                        <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <UserAvatar name={authorName} size="sm" />
+                              <span className="text-xs font-semibold text-foreground">{authorName}</span>
+                            </div>
+                            <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</span>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap">{String(u.body)}</p>
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap">{String(u.body)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : null}
 
-                {!compact ? (
+                {!compact && manage ? (
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
@@ -488,9 +524,7 @@ export function TeamUpdatesFeed({ compact = false, take }: { compact?: boolean; 
                     <button
                       type="button"
                       disabled={!updateText[item.id]?.trim() || updateMutation.isPending}
-                      onClick={() =>
-                        updateMutation.mutate({ customerId, itemId: item.id, body: updateText[item.id] ?? "" })
-                      }
+                      onClick={() => mutateUpdate(item, updateText[item.id] ?? "")}
                       className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                     >
                       Add

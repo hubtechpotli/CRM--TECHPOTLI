@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin } from "@/lib/roles";
 import {
   Users,
@@ -89,6 +90,7 @@ function StatCardSkeleton() {
 
 export default function ReportsPage() {
   const user = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const adminView = isAdmin(user?.role);
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -97,6 +99,7 @@ export default function ReportsPage() {
       const res = await api.get<ReportStats>("/reports/dashboard");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: leaderboard = [], isLoading: leaderboardLoading } = useQuery({
@@ -105,6 +108,7 @@ export default function ReportsPage() {
       const res = await api.get<EmployeePerf[]>("/reports/employee-performance");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: mrr, isLoading: mrrLoading } = useQuery({
@@ -113,6 +117,7 @@ export default function ReportsPage() {
       const res = await api.get<MrrData>("/reports/mrr");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: pl, isLoading: plLoading } = useQuery({
@@ -121,6 +126,7 @@ export default function ReportsPage() {
       const res = await api.get<PlData>("/reports/profit-loss");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const { data: teamWork, isLoading: teamWorkLoading } = useQuery({
@@ -129,7 +135,7 @@ export default function ReportsPage() {
       const res = await api.get<TeamWorkReport>("/reports/team-work");
       return res.data;
     },
-    enabled: adminView,
+    enabled: authReady && adminView,
   });
 
   return (

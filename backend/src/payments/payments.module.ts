@@ -3,9 +3,10 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { UploadsModule } from '../uploads/uploads.module';
 import { InvoicesModule } from '../invoices/invoices.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [UploadsModule, InvoicesModule],
+  imports: [UploadsModule, InvoicesModule, RedisModule],
   controllers: [PaymentsController],
   providers: [PaymentsService],
   exports: [PaymentsService],

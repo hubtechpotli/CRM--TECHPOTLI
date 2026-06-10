@@ -19,6 +19,7 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin } from "@/lib/roles";
 import { useAssignees } from "@/hooks/use-users";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { isTempId } from "@/lib/optimistic-mutation";
 import { PAYMENT_STATUSES } from "@/lib/types";
 
 type PaymentRow = Record<string, unknown> & {
@@ -225,13 +226,21 @@ export default function PaymentsPage() {
         ) : (
           <PremiumDataTable
             rows={rows}
-            onRowClick={(row) => router.push(`/payments/${row.id}`)}
+            onRowClick={(row) => {
+              if (!isTempId(String(row.id))) router.push(`/payments/${row.id}`);
+            }}
             columns={[
               {
                 key: "company",
                 label: "Company",
                 render: (row) => (
-                  <Link href={`/payments/${row.id}`} className="font-medium hover:text-primary">
+                  <Link
+                    href={isTempId(String(row.id)) ? "#" : `/payments/${row.id}`}
+                    onClick={(e) => {
+                      if (isTempId(String(row.id))) e.preventDefault();
+                    }}
+                    className="font-medium hover:text-primary"
+                  >
                     {String(row.customer?.companyName ?? "—")}
                   </Link>
                 ),

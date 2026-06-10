@@ -50,15 +50,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     (async () => {
+      let refreshFailedAuth = false;
       try {
-        await refreshAccessToken();
-      } catch {
+        const token = await refreshAccessToken();
+        if (!token) refreshFailedAuth = true;
+      } catch (err: unknown) {
         restoreSessionToken();
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 401 || status === 403) {
+          refreshFailedAuth = true;
+        }
       }
 
       if (cancelled) return;
 
-      if (!restoreSessionToken() && useAuthStore.getState().user) {
+      if (refreshFailedAuth && !restoreSessionToken() && useAuthStore.getState().user) {
         logout();
       }
 

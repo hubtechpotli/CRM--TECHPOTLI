@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,7 @@ type EmployeeRow = Record<string, unknown>;
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
+  const { authReady } = useAuthReady();
   const canDelete = isSuperAdmin(currentUser?.role);
   const [showNew, setShowNew] = useState(false);
   const [editEmployee, setEditEmployee] = useState<EmployeeRow | null>(null);
@@ -33,6 +35,7 @@ export default function EmployeesPage() {
       const res = await api.get<EmployeeRow[]>("/users");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const rows = Array.isArray(data) ? data : [];

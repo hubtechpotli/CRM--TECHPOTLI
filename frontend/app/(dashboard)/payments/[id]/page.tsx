@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
+import { isTempId } from "@/lib/optimistic-mutation";
+import { queryRetryDelay, shouldRetryQuery } from "@/lib/query-retry";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { useAuthStore } from "@/store/auth-store";
 import { isAdmin } from "@/lib/roles";
 
@@ -24,14 +29,18 @@ export default function PaymentDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const id = String(params.id);
+  const { authReady } = useAuthReady();
   const adminView = isAdmin(useAuthStore((s) => s.user?.role));
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, failureCount } = useQuery({
     queryKey: ["payment", id],
     queryFn: async () => {
       const res = await api.get<PaymentDetail>(`/payments/${id}`);
       return res.data;
     },
+    enabled: authReady && !isTempId(id),
+    retry: shouldRetryQuery,
+    retryDelay: queryRetryDelay,
   });
 
   const verifyMutation = useMutation({
@@ -58,11 +67,40 @@ export default function PaymentDetailPage() {
     },
   });
 
-  if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (isTempId(id)) {
+    return <p className="text-sm text-muted-foreground">Saving collection…</p>;
   }
-  if (error || !data) {
-    return <p className="text-sm text-red-500">Payment not found</p>;
+
+  if (!authReady || isLoading || (isFetching && !data)) {
+    return <CustomerDetailSkeleton />;
+  }
+
+  if (error) {
+    if (isAxiosError(error)) {
+      if (!error.response) {
+        return (
+          <p className="text-sm text-red-500">
+            Cannot reach the API server. Start the backend with <code>npm run start:dev</code> in the backend folder.
+          </p>
+        );
+      }
+      if (error.response.status === 404) {
+        return <p className="text-sm text-red-500">Payment not found</p>;
+      }
+      if (isFetching || failureCount < 2) {
+        return <CustomerDetailSkeleton />;
+      }
+      return (
+        <p className="text-sm text-red-500">
+          {getApiErrorMessage(error, "Could not load collection. Please refresh the page.")}
+        </p>
+      );
+    }
+    return <p className="text-sm text-red-500">Could not load collection. Please refresh the page.</p>;
+  }
+
+  if (!data) {
+    return <CustomerDetailSkeleton />;
   }
 
   const mutationError =

@@ -308,8 +308,8 @@ export class CustomersService {
       metadata: { workItemId: item.id, category: item.category, assignedToId: item.assignedToId },
     });
 
-    await this.notifyWorkItemAssignment(item, userId, 'created');
-    await this.broadcastWorkItem(item, customer.companyName);
+    void this.notifyWorkItemAssignment(item, userId, 'created');
+    void this.broadcastWorkItem(item, customer.companyName);
     return item;
   }
 
@@ -317,13 +317,13 @@ export class CustomersService {
     customerId: string,
     itemId: string,
     userId: string,
-    userRole: UserRole,
+    _userRole: UserRole,
     status: CustomerWorkItemStatus,
     note?: string,
   ) {
     const item = await this.prisma.customerWorkItem.findFirst({ where: { id: itemId, customerId } });
     if (!item) throw new NotFoundException('Work item not found');
-    this.assertCanManageWorkItem(item, userId, userRole);
+    this.assertWorkItemOpenForUpdate(item);
 
     const fromStatus = item.status;
     const completedAt = status === 'COMPLETED' ? new Date() : status === 'OPEN' || status === 'IN_PROGRESS' ? null : item.completedAt;
@@ -372,12 +372,12 @@ export class CustomersService {
     });
 
     if (updated) {
-      await this.notifyWorkItemAssignment(updated, userId, 'updated');
+      void this.notifyWorkItemAssignment(updated, userId, 'updated');
       const customer = await this.prisma.customer.findUnique({
         where: { id: customerId },
         select: { companyName: true },
       });
-      await this.broadcastWorkItem(updated, customer?.companyName ?? 'Customer');
+      void this.broadcastWorkItem(updated, customer?.companyName ?? 'Customer');
     }
     return updated;
   }
@@ -391,6 +391,7 @@ export class CustomersService {
   ) {
     const item = await this.prisma.customerWorkItem.findFirst({ where: { id: itemId, customerId } });
     if (!item) throw new NotFoundException('Work item not found');
+    this.assertWorkItemOpenForUpdate(item);
     const trimmed = body?.trim();
     if (!trimmed) throw new BadRequestException('Update text is required');
 
@@ -433,20 +434,14 @@ export class CustomersService {
         where: { id: customerId },
         select: { companyName: true },
       });
-      await this.broadcastWorkItem(result, customer?.companyName ?? 'Customer');
+      void this.broadcastWorkItem(result, customer?.companyName ?? 'Customer');
     }
     return result;
   }
 
-  private assertCanManageWorkItem(
-    item: { createdById: string; assignedToId: string | null },
-    userId: string,
-    userRole: UserRole,
-  ) {
-    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
-    const isOwner = item.createdById === userId || item.assignedToId === userId;
-    if (!isAdmin && !isOwner) {
-      throw new ForbiddenException('You can only update work items you created or are assigned to');
+  private assertWorkItemOpenForUpdate(item: { status: string }) {
+    if (item.status === 'COMPLETED' || item.status === 'CANCELLED') {
+      throw new ForbiddenException('This work item is closed and cannot be updated');
     }
   }
 

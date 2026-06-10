@@ -10,6 +10,7 @@ import { S3Service } from '../uploads/s3.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CacheService } from '../redis/cache.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 
@@ -30,6 +31,7 @@ export class PaymentsService {
     private activityLog: ActivityLogService,
     private invoices: InvoicesService,
     private notifications: NotificationsService,
+    private cache: CacheService,
   ) {}
 
   private isAdmin(role: string) {
@@ -256,6 +258,8 @@ export class PaymentsService {
       recordId: payment.id,
       newValue: { customerId: dto.customerId, paidAmount: paid, status },
     });
+
+    void this.cache.bumpNamespace('crm-insights');
 
     if (status === PaymentStatus.PAID && paid >= PROOF_REQUIRED_ABOVE) {
       const creator = await this.prisma.user.findUnique({
