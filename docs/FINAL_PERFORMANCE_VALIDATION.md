@@ -104,3 +104,50 @@ Ongoing: BullMQ `dashboard-snapshot` job every 5 minutes.
 Validation phase is **complete**. Dashboard and reports serve **snapshot-only** data with no expensive live aggregation on the read path. Analytics snapshot tables are populated via BullMQ. Query plans are index-backed and sub-millisecond at the database. API benchmarks confirm all endpoints return HTTP 200 with measurable P50/P95/P99.
 
 **Recommended next step for production:** Deploy API + worker to co-located region with Postgres/Redis to eliminate cross-region RTT from end-user measurements.
+
+---
+
+## Phase 2 validation — bottleneck measurement (2026-06-10)
+
+### Request timing instrumentation
+
+Every hot API response now includes a `Server-Timing` header:
+
+```
+Server-Timing: total;dur=2300, jwt;dur=380, redis;dur=25, prisma;dur=18, handler;dur=12, json;dur=8, overhead;dur=1857
+```
+
+Enable verbose logs: `ENABLE_REQUEST_TIMING=true`
+
+Run benchmark with timing breakdown:
+
+```bash
+cd backend
+TOKEN=$(npx ts-node --transpile-only scripts/bench-token.ts)
+API_URL=http://localhost:3001/api ITERATIONS=10 TOKEN=$TOKEN npx ts-node --transpile-only scripts/bench-api.ts
+```
+
+**Decision rule:** If `overhead` > 70% of `total`, prioritize Railway Singapore co-location (see `PRODUCTION_DEPLOYMENT_CHECKLIST.md`) before further SQL tuning.
+
+### Backend optimizations added (no UI changes)
+
+| Feature | Status |
+|---------|--------|
+| `user_permissions:{userId}` Redis cache (5 min TTL) | Deployed |
+| `CustomerSummary` table + BullMQ `customer-summary-refresh` | Deployed + seeded |
+| `SearchIndex` table + nightly `search-index-rebuild` | Deployed + 42 rows |
+| Prometheus histograms (`http_request_duration_seconds`, etc.) | Deployed |
+| Grafana dashboard `api-performance.json` | Added |
+| Dashboard prefetch key fix + session-restore prefetch | Deployed |
+| Team updates panel skeleton (same layout) | Deployed |
+
+### Re-benchmark after Singapore deploy
+
+From Railway API container (same region as Postgres):
+
+```bash
+npx ts-node --transpile-only scripts/bench-db-reads.ts   # expect p50 < 10ms
+npx ts-node --transpile-only scripts/bench-api.ts        # expect p95 < 500ms on hot routes
+```
+
+Update the tables in this document with Singapore-measured numbers after deploy.

@@ -5,6 +5,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ReportsModule } from '../reports/reports.module';
+import { CustomersModule } from '../customers/customers.module';
+import { SearchModule } from '../search/search.module';
 import { CronProcessor } from './cron.processor';
 import { CronSchedulerService } from './cron-scheduler.service';
 import { PdfProcessor } from './pdf.processor';
@@ -22,6 +24,8 @@ import { bullConnectionFactory } from './bull.config';
     UploadsModule,
     NotificationsModule,
     ReportsModule,
+    CustomersModule,
+    SearchModule,
   ],
   providers: [CronProcessor, CronSchedulerService, PdfProcessor],
   exports: [BullModule],

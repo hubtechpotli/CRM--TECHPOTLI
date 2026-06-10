@@ -634,6 +634,7 @@ model Customer {
   favoritedBy        CustomerFavorite[]
   recentlyViewedBy   CustomerRecentlyViewed[]
   portalAccess       ClientPortalAccess[]
+  summary            CustomerSummary?
 
   @@index([companyName])
   @@index([ownerName])
@@ -1483,6 +1484,38 @@ model EmployeePerformanceSnapshot {
 
   @@unique([snapshotDate, userId])
   @@index([userId])
+}
+
+model CustomerSummary {
+  customerId     String    @id
+  companyName    String
+  projectCount   Int       @default(0)
+  invoiceCount   Int       @default(0)
+  pendingAmount  Decimal   @default(0) @db.Decimal(14, 2)
+  lastActivityAt DateTime?
+  renewalCount   Int       @default(0)
+  openTasks      Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt(sort: Desc)])
+  @@index([lastActivityAt(sort: Desc)])
+}
+
+model SearchIndex {
+  id           String   @id @default(cuid())
+  entityType   String
+  entityId     String
+  title        String
+  subtitle     String?
+  searchText   String
+  assignedToId String?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([entityType])
+  @@index([assignedToId])
 }
 
 // ─── WORKFLOW AUTOMATION ─────────────────────────────────────────────────────

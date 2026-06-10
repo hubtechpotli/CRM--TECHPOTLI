@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { bullConnectionFactory } from './jobs/bull.config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { RequestTimingMiddleware } from './common/middleware/request-timing.middleware';
+import { RequestTimingInterceptor } from './common/interceptors/request-timing.interceptor';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { RedisThrottlerStorage } from './common/redis-throttler.storage';
 import { PrismaModule } from './prisma/prisma.module';
@@ -116,6 +118,11 @@ const cronJobModules =
     { provide: APP_GUARD, useClass: MustChangePasswordGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: IpWhitelistGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestTimingInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestTimingMiddleware).forRoutes('*');
+  }
+}

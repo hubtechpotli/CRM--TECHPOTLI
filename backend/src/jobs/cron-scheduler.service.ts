@@ -15,6 +15,8 @@ export class CronSchedulerService implements OnModuleInit {
       { name: 'work-order-escalation', pattern: '*/30 * * * *' },
       { name: 'quotation-expiry-check', pattern: '0 9 * * *' },
       { name: 'dashboard-snapshot', pattern: '*/5 * * * *' },
+      { name: 'customer-summary-refresh', pattern: '*/5 * * * *' },
+      { name: 'search-index-rebuild', pattern: '0 2 * * *' },
     ];
     for (const j of jobs) {
       try {

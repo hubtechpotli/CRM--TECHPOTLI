@@ -9,6 +9,7 @@ import type { GlobalWorkItem, TeamFeedResponse, TeamUpdatesSummary } from "@/lib
 import { normalizePaginated } from "@/lib/pagination";
 import { formatDateTime, formatLabel } from "@/lib/format";
 import { SectionCard } from "@/components/dashboard/section-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function TeamUpdatesPanel({ highlighted = false }: { highlighted?: boolean }) {
@@ -97,7 +98,11 @@ export function TeamUpdatesPanel({ highlighted = false }: { highlighted?: boolea
 
       <div className="p-5">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <div className="py-6 text-center">
             <MessageSquare className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />

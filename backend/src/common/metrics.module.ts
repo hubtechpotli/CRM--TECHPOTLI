@@ -1,6 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
+import { RequestTimingMetrics } from './request-timing.metrics';
 
+@Global()
 @Module({
   imports: [
     PrometheusModule.register({
@@ -8,5 +10,7 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
       defaultMetrics: { enabled: true },
     }),
   ],
+  providers: [RequestTimingMetrics],
+  exports: [RequestTimingMetrics],
 })
 export class MetricsModule {}

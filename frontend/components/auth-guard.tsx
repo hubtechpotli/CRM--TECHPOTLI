@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth-store";
 import { refreshAccessToken } from "@/lib/api";
 import { isJwtExpired } from "@/lib/jwt";
 import { useSessionRefresh } from "@/hooks/use-session-refresh";
+import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
 import { AppShellSkeleton } from "@/components/ui/skeleton";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -23,6 +25,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const logout = useAuthStore((s) => s.logout);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [hydrated, setHydrated] = useState(false);
+  const queryClient = useQueryClient();
+  const prefetchedRef = useRef(false);
 
   useSessionRefresh();
 
@@ -116,6 +120,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     setPending2FA,
     setPending2FASetup,
   ]);
+
+  useEffect(() => {
+    if (bootstrapping || !hasValidSession() || prefetchedRef.current) return;
+    prefetchedRef.current = true;
+    void prefetchAfterAuth(queryClient, user?.role);
+  }, [bootstrapping, hasValidSession, queryClient, user?.role]);
 
   if (!hydrated || bootstrapping) {
     return <AppShellSkeleton />;

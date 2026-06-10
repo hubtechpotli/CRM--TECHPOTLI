@@ -6,6 +6,7 @@ import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionService } from '../redis/session.service';
 import { buildSessionClientUpdate } from '../common/utils/session-client.util';
+import { addJwtMs, setJwtCacheHit } from '../common/request-timing.context';
 
 type SessionContext = {
   sub: string;
@@ -41,6 +42,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     req: Request,
     payload: { sub: string; email: string; role: string; sid?: string },
   ) {
+    const jwtStart = performance.now();
+    try {
+      return await this.validateSession(req, payload);
+    } finally {
+      addJwtMs(performance.now() - jwtStart);
+    }
+  }
+
+  private async validateSession(
+    req: Request,
+    payload: { sub: string; email: string; role: string; sid?: string },
+  ) {
     if (!payload.sid) throw new UnauthorizedException('Session expired');
 
     if (this.sessionCacheEnabled()) {
@@ -49,12 +62,31 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         const valid = await this.sessions.isSessionValid(payload.sid, payload.sub);
         if (valid) {
           void this.touchActivity(payload.sid, req);
+          setJwtCacheHit(true);
           return cached;
         }
       }
     }
 
-    const user = await this.prisma.user.findUnique({
+    setJwtCacheHit(false);
+
+    const permissions = await this.sessions.getUserPermissions(payload.sub);
+    const userFromCache = permissions
+      ? {
+          id: payload.sub,
+          email: payload.email,
+          role: permissions.role,
+          isActive: true,
+          allowedIPs: permissions.allowedIPs,
+          allowRemoteAccess: permissions.allowRemoteAccess,
+          twoFactorEnabled: permissions.twoFactorEnabled,
+          mustChangePassword: permissions.mustChangePassword,
+        }
+      : null;
+
+    const user =
+      userFromCache ??
+      (await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
         id: true,
@@ -66,10 +98,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         twoFactorEnabled: true,
         mustChangePassword: true,
       },
-    });
+    }));
+
     if (!user?.isActive) throw new UnauthorizedException('Session expired');
     if (!user.twoFactorEnabled) {
       throw new UnauthorizedException('Two-factor authentication required. Please sign in again.');
+    }
+
+    if (!userFromCache) {
+      void this.sessions.setUserPermissions(payload.sub, {
+        role: user.role,
+        allowedIPs: user.allowedIPs,
+        allowRemoteAccess: user.allowRemoteAccess,
+        mustChangePassword: user.mustChangePassword,
+        twoFactorEnabled: user.twoFactorEnabled,
+      });
     }
 
     const session = await this.prisma.userSession.findFirst({

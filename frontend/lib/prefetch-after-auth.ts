@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
 export async function prefetchAfterAuth(
   queryClient: QueryClient,
@@ -13,10 +14,15 @@ export async function prefetchAfterAuth(
       staleTime: 60_000,
     }),
     queryClient.prefetchQuery({
-      queryKey: ["customers-directory", { page: 1, limit: 50 }],
+      queryKey: ["reports-dashboard"],
+      queryFn: async () => (await api.get("/reports/dashboard")).data,
+      staleTime: 60_000,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["customers-directory", { page: 1, limit: DEFAULT_PAGE_SIZE }],
       queryFn: async () =>
         import("@/lib/customers-directory").then((m) =>
-          m.fetchCustomersDirectory({ page: 1, limit: 50 }),
+          m.fetchCustomersDirectory({ page: 1, limit: DEFAULT_PAGE_SIZE }),
         ),
       staleTime: 60_000,
     }),

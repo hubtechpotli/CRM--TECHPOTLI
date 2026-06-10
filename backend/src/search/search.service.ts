@@ -5,6 +5,7 @@ import { PrismaReadService } from '../prisma/prisma-read.service';
 import { CacheService } from '../redis/cache.service';
 import { OllamaService } from '../ai/ollama.service';
 import { isLeadAdmin } from '../leads/lead-access';
+import { SearchIndexService } from './search-index.service';
 
 @Injectable()
 export class SearchService {
@@ -13,6 +14,7 @@ export class SearchService {
     private prismaRead: PrismaReadService,
     private cache: CacheService,
     private ollama: OllamaService,
+    private searchIndex: SearchIndexService,
   ) {}
 
   async search(q: string, userRole?: string, userId?: string) {
@@ -42,6 +44,15 @@ export class SearchService {
   }
 
   private async keywordSearch(term: string, userRole?: string, userId?: string) {
+    try {
+      const indexCount = await this.prisma.searchIndex.count();
+      if (indexCount > 0) {
+        return this.searchIndex.keywordSearchFromIndex(term, userRole, userId);
+      }
+    } catch {
+      /* fall through to legacy FTS */
+    }
+
     const tsQuery = term.split(/\s+/).filter(Boolean).join(' & ');
     const leadScope = this.leadScopeSql(userRole, userId);
     try {

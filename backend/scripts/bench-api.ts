@@ -13,10 +13,55 @@ const token = process.env.TOKEN || '';
 const iterations = Math.max(5, parseInt(process.env.ITERATIONS || '30', 10));
 const warmup = Math.min(3, iterations);
 
+type ServerTiming = {
+  total?: number;
+  jwt?: number;
+  redis?: number;
+  prisma?: number;
+  handler?: number;
+  json?: number;
+  overhead?: number;
+};
+
+function parseServerTiming(header: string | null): ServerTiming {
+  if (!header) return {};
+  const out: ServerTiming = {};
+  for (const part of header.split(',')) {
+    const [name, durPart] = part.trim().split(';');
+    const durMatch = durPart?.match(/dur=([\d.]+)/);
+    if (!durMatch) continue;
+    const ms = Math.round(parseFloat(durMatch[1]));
+    switch (name.trim()) {
+      case 'total':
+        out.total = ms;
+        break;
+      case 'jwt':
+        out.jwt = ms;
+        break;
+      case 'redis':
+        out.redis = ms;
+        break;
+      case 'prisma':
+        out.prisma = ms;
+        break;
+      case 'handler':
+        out.handler = ms;
+        break;
+      case 'json':
+        out.json = ms;
+        break;
+      case 'overhead':
+        out.overhead = ms;
+        break;
+    }
+  }
+  return out;
+}
+
 async function apiGet(
   path: string,
   params?: Record<string, string | number>,
-): Promise<{ status: number; data: unknown }> {
+): Promise<{ status: number; data: unknown; timing: ServerTiming }> {
   const url = new URL(path, baseURL.endsWith('/') ? baseURL : `${baseURL}/`);
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
@@ -25,16 +70,17 @@ async function apiGet(
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal: AbortSignal.timeout(60_000),
   });
+  const timing = parseServerTiming(res.headers.get('server-timing'));
   let data: unknown;
   try {
     data = await res.json();
   } catch {
     data = await res.text();
   }
-  return { status: res.status, data };
+  return { status: res.status, data, timing };
 }
 
-type Sample = { ms: number; status: number; bytes: number };
+type Sample = { ms: number; status: number; bytes: number; timing: ServerTiming };
 type EndpointStats = {
   name: string;
   samples: number;
@@ -46,6 +92,7 @@ type EndpointStats = {
   avg: number;
   errors: number;
   lastStatus: number;
+  timingP50?: ServerTiming;
 };
 
 function percentile(sorted: number[], p: number): number {
@@ -54,17 +101,19 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, Math.min(sorted.length - 1, idx))];
 }
 
-async function sample(fn: () => Promise<{ status: number; data: unknown }>): Promise<Sample> {
+async function sample(
+  fn: () => Promise<{ status: number; data: unknown; timing: ServerTiming }>,
+): Promise<Sample> {
   const start = performance.now();
   const res = await fn();
   const ms = performance.now() - start;
   const bytes = JSON.stringify(res.data ?? '').length;
-  return { ms, status: res.status, bytes };
+  return { ms, status: res.status, bytes, timing: res.timing };
 }
 
 async function benchEndpoint(
   name: string,
-  run: () => Promise<{ status: number; data: unknown }>,
+  run: () => Promise<{ status: number; data: unknown; timing: ServerTiming }>,
 ): Promise<EndpointStats> {
   for (let i = 0; i < warmup; i++) await run();
 
@@ -77,6 +126,8 @@ async function benchEndpoint(
   const errors = samples.filter((s) => s.status >= 400).length;
   const sum = times.reduce((a, b) => a + b, 0);
 
+  const mid = samples[Math.floor(samples.length / 2)]?.timing;
+
   return {
     name,
     samples: samples.length,
@@ -88,6 +139,7 @@ async function benchEndpoint(
     avg: Math.round(sum / (times.length || 1)),
     errors,
     lastStatus: samples[samples.length - 1]?.status ?? 0,
+    timingP50: mid,
   };
 }
 
@@ -124,7 +176,14 @@ async function main() {
   }
 
   console.log('\n--- Results (ms) ---\n');
-  for (const r of results) console.log(formatRow(r));
+  for (const r of results) {
+    console.log(formatRow(r));
+    if (r.timingP50?.overhead !== undefined) {
+      console.log(
+        `  └ timing p50: jwt=${r.timingP50.jwt ?? 0}ms redis=${r.timingP50.redis ?? 0}ms prisma=${r.timingP50.prisma ?? 0}ms overhead=${r.timingP50.overhead ?? 0}ms`,
+      );
+    }
+  }
 
   const payload = {
     generatedAt: new Date().toISOString(),

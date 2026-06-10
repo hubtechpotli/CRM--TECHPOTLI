@@ -4,6 +4,34 @@ Use this checklist when promoting `feature/performance-optimization` to producti
 
 ---
 
+## Infrastructure — Singapore co-location (required)
+
+Deploy all backend services in **one Railway region** (Singapore / `asia-southeast1`):
+
+| Service | Platform | Region |
+|---------|----------|--------|
+| Frontend | Vercel | Singapore (`sin1`) when available |
+| API | Railway | Singapore |
+| Worker (BullMQ) | Railway | Singapore |
+| PostgreSQL | Railway | Singapore |
+| Redis | Railway | Singapore |
+
+Steps:
+
+1. Railway project → Settings → Region: **Southeast Asia (Singapore)**
+2. Ensure Postgres, Redis, API, and Worker services are in the **same project**
+3. Vercel → Project Settings → `API_PROXY_TARGET` = Singapore Railway API URL (no `/api` suffix)
+4. Vercel → Functions region: prefer **Singapore** for lowest latency to Railway API
+
+Verify API → DB RTT from Railway shell:
+
+```bash
+npx ts-node --transpile-only scripts/bench-db-reads.ts
+# Expect DashboardSnapshot p50 < 10ms (not ~300ms cross-region)
+```
+
+---
+
 ## Pre-deploy
 
 - [ ] Review [FINAL_PERFORMANCE_VALIDATION.md](./FINAL_PERFORMANCE_VALIDATION.md)
@@ -28,6 +56,7 @@ Migrations included in this release:
 
 1. `20260610120000_performance_indexes` — list/search indexes
 2. `20260610140000_analytics_snapshots` — `DailyRevenueSnapshot`, `MonthlyRevenueSnapshot`, `MrrSnapshot`, `EmployeePerformanceSnapshot`
+3. `20260610160000_customer_summary_search_index` — `CustomerSummary`, `SearchIndex`
 
 ---
 
@@ -41,6 +70,15 @@ npx ts-node --transpile-only scripts/refresh-snapshots.ts
 ```
 
 Or wait up to 5 minutes for the `dashboard-snapshot` BullMQ cron job.
+
+Also seed customer summaries and search index (or wait for cron):
+
+```bash
+# Customer summaries — every 5 min via customer-summary-refresh cron
+# Search index — nightly via search-index-rebuild cron, or trigger manually from worker
+```
+
+Set `ENABLE_REQUEST_TIMING=true` temporarily after deploy to capture per-phase breakdown logs (`JWT`, `Redis`, `Prisma`, `Overhead`).
 
 Verify:
 
@@ -124,9 +162,11 @@ Targets (co-located with DB):
 
 ## Monitoring
 
-- Watch BullMQ `cron` queue for `dashboard-snapshot` failures
+- Watch BullMQ `cron` queue for `dashboard-snapshot`, `customer-summary-refresh`, `search-index-rebuild` failures
 - Alert if `GET /reports/dashboard` returns 503 for > 10 minutes
-- Prometheus metrics endpoint (if enabled): API latency histograms
+- Prometheus `/api/metrics`: `http_request_duration_seconds`, `auth_jwt_duration_seconds`, `prisma_query_duration_seconds`, `redis_cache_hit_total`
+- Grafana dashboard: **TechPotli API Performance** (`grafana/dashboards/api-performance.json`)
+- Response headers include `Server-Timing` for bench correlation (`jwt`, `redis`, `prisma`, `overhead`)
 
 ---
 

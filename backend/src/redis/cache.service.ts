@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { ConsistentHashRing } from './hash-ring';
+import { RequestTimingMetrics } from '../common/request-timing.metrics';
 
 @Injectable()
 export class CacheService {
   private readonly ring: ConsistentHashRing;
 
-  constructor(private redis: RedisService) {
+  constructor(
+    private redis: RedisService,
+    private timingMetrics: RequestTimingMetrics,
+  ) {
     const nodes = (process.env.REDIS_SHARD_NODES || 'shard-0,shard-1,shard-2').split(',');
     this.ring = new ConsistentHashRing(nodes);
   }
@@ -35,7 +39,11 @@ export class CacheService {
 
   async wrap<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
     const cached = await this.get<T>(key);
-    if (cached !== null) return cached;
+    if (cached !== null) {
+      this.timingMetrics.redisCacheHits.inc();
+      return cached;
+    }
+    this.timingMetrics.redisCacheMisses.inc();
     const result = await fn();
     await this.set(key, result, ttlSeconds);
     return result;

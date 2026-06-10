@@ -1,13 +1,18 @@
 import { Global, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { addRedisMs } from '../common/request-timing.context';
+import { RequestTimingMetrics } from '../common/request-timing.metrics';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   readonly client: Redis;
 
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private timingMetrics: RequestTimingMetrics,
+  ) {
     const url = config.get<string>('REDIS_URL') || 'redis://localhost:6379';
     this.client = new Redis(url, {
       maxRetriesPerRequest: null,
@@ -31,9 +36,20 @@ export class RedisService implements OnModuleDestroy {
     });
   }
 
+  private async timed<T>(fn: () => Promise<T>): Promise<T> {
+    const start = performance.now();
+    try {
+      return await fn();
+    } finally {
+      const ms = performance.now() - start;
+      addRedisMs(ms);
+      this.timingMetrics.recordRedis(ms / 1000);
+    }
+  }
+
   async get(key: string): Promise<string | null> {
     try {
-      return await this.client.get(key);
+      return await this.timed(() => this.client.get(key));
     } catch {
       return null;
     }
@@ -41,8 +57,10 @@ export class RedisService implements OnModuleDestroy {
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     try {
-      if (ttlSeconds) await this.client.setex(key, ttlSeconds, value);
-      else await this.client.set(key, value);
+      await this.timed(async () => {
+        if (ttlSeconds) await this.client.setex(key, ttlSeconds, value);
+        else await this.client.set(key, value);
+      });
     } catch {
       /* noop */
     }
@@ -50,7 +68,7 @@ export class RedisService implements OnModuleDestroy {
 
   async del(key: string): Promise<void> {
     try {
-      await this.client.del(key);
+      await this.timed(() => this.client.del(key));
     } catch {
       /* noop */
     }
@@ -59,7 +77,7 @@ export class RedisService implements OnModuleDestroy {
   async ping(): Promise<boolean> {
     try {
       if (this.client.status !== 'ready') return false;
-      return (await this.client.ping()) === 'PONG';
+      return (await this.timed(() => this.client.ping())) === 'PONG';
     } catch {
       return false;
     }

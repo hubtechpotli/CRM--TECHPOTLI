@@ -24,6 +24,8 @@ import {
 } from '../mail/templates/customer-notice.template';
 import { SendCustomerEmailDto } from './dto/send-customer-email.dto';
 import { CacheService } from '../redis/cache.service';
+import { CustomerSummaryRefreshService } from './customer-summary-refresh.service';
+import { SearchIndexService } from '../search/search-index.service';
 
 @Injectable()
 export class CustomersService {
@@ -35,6 +37,8 @@ export class CustomersService {
     private notifications: NotificationsService,
     private gateway: NotificationsGateway,
     private cache: CacheService,
+    private summaryRefresh: CustomerSummaryRefreshService,
+    private searchIndex: SearchIndexService,
   ) {}
 
   private workItemInclude = {
@@ -50,6 +54,11 @@ export class CustomersService {
 
   private async invalidateDirectoryCache() {
     await this.cache.bumpNamespace('customers-directory');
+  }
+
+  private bumpSummary(customerId: string) {
+    void this.summaryRefresh.refreshOne(customerId).catch(() => undefined);
+    void this.searchIndex.upsertCustomer(customerId).catch(() => undefined);
   }
 
   findAll() {
@@ -88,20 +97,20 @@ export class CustomersService {
           take: safeLimit,
           include: {
             assignedEmployee: { select: { id: true, name: true } },
-            _count: {
-              select: {
-                workItems: { where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } },
-              },
-            },
+            summary: true,
           },
         }),
         this.prisma.customer.count({ where }),
       ]);
 
       return {
-        items: rows.map(({ _count, ...row }) => ({
+        items: rows.map(({ summary, ...row }) => ({
           ...row,
-          openWorkItemCount: _count.workItems,
+          openWorkItemCount: summary?.openTasks ?? 0,
+          projectCount: summary?.projectCount ?? 0,
+          invoiceCount: summary?.invoiceCount ?? 0,
+          pendingAmount: summary ? Number(summary.pendingAmount) : 0,
+          lastActivityAt: summary?.lastActivityAt ?? null,
         })),
         total,
         page: safePage,
@@ -110,11 +119,30 @@ export class CustomersService {
     });
   }
 
-  findOne(id: string) {
-    return this.prisma.customer.findUnique({
+  async findOne(id: string) {
+    const customer = await this.prisma.customer.findUnique({
       where: { id },
-      include: { services: true, assignedEmployee: { select: { id: true, name: true } } },
+      include: {
+        services: true,
+        assignedEmployee: { select: { id: true, name: true } },
+        summary: true,
+      },
     });
+    if (!customer) return null;
+    const { summary, ...rest } = customer;
+    return {
+      ...rest,
+      summary: summary
+        ? {
+            projectCount: summary.projectCount,
+            invoiceCount: summary.invoiceCount,
+            pendingAmount: Number(summary.pendingAmount),
+            lastActivityAt: summary.lastActivityAt,
+            renewalCount: summary.renewalCount,
+            openTasks: summary.openTasks,
+          }
+        : null,
+    };
   }
 
   async create(data: Prisma.CustomerCreateInput, createdById: string) {
@@ -128,12 +156,14 @@ export class CustomersService {
       userId: createdById,
     });
     await this.invalidateDirectoryCache();
+    this.bumpSummary(customer.id);
     return customer;
   }
 
   async update(id: string, data: Prisma.CustomerUpdateInput) {
     const customer = await this.prisma.customer.update({ where: { id }, data });
     await this.invalidateDirectoryCache();
+    this.bumpSummary(id);
     return customer;
   }
 
