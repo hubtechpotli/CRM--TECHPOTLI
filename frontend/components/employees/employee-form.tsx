@@ -117,6 +117,7 @@ export function EmployeeForm({
           department: payload.department.trim() || undefined,
           designation: payload.designation.trim() || undefined,
           isActive: payload.isActive === "true",
+          allowRemoteAccess: payload.allowRemoteAccess === "true",
         };
         patchMatchingListItems(queryClient, ["employees"], employeeId, patch);
         return {};
@@ -213,11 +214,11 @@ export function EmployeeForm({
                 onChange={(v) => set("allowRemoteAccess", v)}
                 options={[
                   { value: "false", label: "Office network only" },
-                  { value: "true", label: "Allow remote login (requires 2FA)" },
+                  { value: "true", label: "Allow remote login (work from home)" },
                 ]}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Remote access is only allowed when the employee has 2FA enabled.
+                Lets this employee sign in from outside the office network. Enabling 2FA is strongly recommended for remote access.
               </p>
             </FormField>
           </>

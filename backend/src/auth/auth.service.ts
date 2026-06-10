@@ -80,7 +80,22 @@ export class AuthService {
       throw new UnauthorizedException('Account locked. Try again in 15 minutes.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        passwordHash: true,
+        isActive: true,
+        twoFactorSecret: true,
+        twoFactorEnabled: true,
+        allowRemoteAccess: true,
+        mustChangePassword: true,
+        allowedIPs: true,
+      },
+    });
     const fail = async () => {
       const attemptsKey = `login:attempts:${email.toLowerCase()}`;
       const raw = await this.redis.get(attemptsKey);
