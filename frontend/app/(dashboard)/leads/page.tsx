@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { removeListItem } from "@/lib/optimistic-mutation";
+import { isAxiosError } from "axios";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -40,13 +43,13 @@ import {
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { StatusTabs } from "@/components/dashboard/status-tabs";
 import { SectionCard } from "@/components/dashboard/section-card";
-import { PremiumDataTable } from "@/components/dashboard/premium-data-table";
+import { PremiumDataTable, type RowAction } from "@/components/dashboard/premium-data-table";
 import { Modal } from "@/components/ui/modal";
 import { SelectInput } from "@/components/ui/form-field";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
-import { isAdmin } from "@/lib/roles";
+import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -72,14 +75,44 @@ const STATUS_TABS = [
 export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const adminView = isAdmin(user?.role);
+  const canDelete = isSuperAdmin(user?.role);
   const { data: assignees = [] } = useAssignees();
   const [view, setView] = useState<"list" | "kanban">("list");
   const [showNewLead, setShowNewLead] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const deleteMutation = useOptimisticMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/leads/${id}`);
+    },
+    snapshotKeys: [["leads"], ["leads-kanban"]],
+    invalidateKeys: [["leads"], ["leads-kanban"]],
+    onMutate: (id) => {
+      setDeleteError(null);
+      for (const query of queryClient.getQueryCache().findAll({ queryKey: ["leads"] })) {
+        removeListItem(queryClient, query.queryKey, id);
+      }
+    },
+    onError: (err) => {
+      setDeleteError(
+        isAxiosError(err)
+          ? String((err.response?.data as { message?: string })?.message ?? err.message)
+          : "Failed to delete lead",
+      );
+    },
+  });
+
+  function handleDeleteLead(row: LeadRow) {
+    const name = String(row.companyName ?? "this lead");
+    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
+    deleteMutation.mutate(String(row.id));
+  }
 
   useEffect(() => {
     if (searchParams.get("new") === "1") setShowNewLead(true);
@@ -154,6 +187,9 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-6">
+      {deleteError ? (
+        <p className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+      ) : null}
       <PageToolbar
         title={adminView ? "All Leads" : "My Leads"}
         description={
@@ -236,11 +272,20 @@ export default function LeadsPage() {
             onRowClick={(row) => {
               if (!isTempId(String(row.id))) router.push(`/leads/${row.id}`);
             }}
-            rowActions={(row) =>
-              isTempId(String(row.id))
-                ? []
-                : [{ label: "View lead", onClick: () => router.push(`/leads/${row.id}`) }]
-            }
+            rowActions={(row) => {
+              if (isTempId(String(row.id))) return [];
+              const actions: RowAction<typeof row>[] = [
+                { label: "View lead", onClick: () => router.push(`/leads/${row.id}`) },
+              ];
+              if (canDelete) {
+                actions.push({
+                  label: "Delete",
+                  onClick: () => handleDeleteLead(row),
+                  destructive: true,
+                });
+              }
+              return actions;
+            }}
             columns={[
               {
                 key: "company",

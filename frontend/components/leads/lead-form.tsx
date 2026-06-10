@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useFormDraft } from "@/hooks/use-form-draft";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import {
@@ -80,12 +81,18 @@ export function LeadForm({
 }) {
   const queryClient = useQueryClient();
   const isEdit = !!lead?.id;
-  const [form, setForm] = useState<LeadFormData>(() => toFormData(lead));
+  const [editForm, setEditForm] = useState<LeadFormData>(() => toFormData(lead));
+  const { form: draftForm, setForm: setDraftForm, restored, discardDraft, clearDraft } = useFormDraft({
+    draftKey: "lead:new",
+    initial: emptyForm,
+    enabled: !isEdit,
+  });
+  const form = isEdit ? editForm : draftForm;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setForm(toFormData(lead));
-  }, [lead]);
+    if (isEdit) setEditForm(toFormData(lead));
+  }, [lead, isEdit]);
 
   function buildBody(payload: LeadFormData) {
     return {
@@ -138,6 +145,7 @@ export function LeadForm({
           data as { id: string },
         );
       }
+      if (!isEdit) clearDraft();
       if (data && typeof data === "object") {
         onSuccess?.(data as Record<string, unknown>);
       }
@@ -157,12 +165,21 @@ export function LeadForm({
   }
 
   function set<K extends keyof LeadFormData>(key: K, value: LeadFormData[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    if (isEdit) setEditForm((prev) => ({ ...prev, [key]: value }));
+    else setDraftForm((prev) => ({ ...prev, [key]: value }));
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex max-h-[70vh] flex-col">
       <div className="flex-1 space-y-6 overflow-y-auto pr-1">
+        {!isEdit && restored ? (
+          <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Draft restored</span>
+            <button type="button" onClick={discardDraft} className="text-primary hover:underline">
+              Discard draft
+            </button>
+          </div>
+        ) : null}
         {error ? (
           <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
         ) : null}

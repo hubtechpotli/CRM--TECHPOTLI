@@ -1,0 +1,185 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { formatDate, formatLabel, formatMoney } from "@/lib/format";
+import { GlassCard } from "@/components/ui/glass-card";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { useAuthStore } from "@/store/auth-store";
+import { isAdmin } from "@/lib/roles";
+
+type PaymentDetail = Record<string, unknown> & {
+  customer?: { id?: string; companyName?: string };
+  invoice?: { id?: string; invoiceNumber?: string };
+  createdBy?: { name?: string };
+  verifiedBy?: { name?: string };
+  proofUrl?: string | null;
+};
+
+export default function PaymentDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const id = String(params.id);
+  const adminView = isAdmin(useAuthStore((s) => s.user?.role));
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["payment", id],
+    queryFn: async () => {
+      const res = await api.get<PaymentDetail>(`/payments/${id}`);
+      return res.data;
+    },
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/payments/${id}/verify`);
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["payment", id] });
+      void queryClient.invalidateQueries({ queryKey: ["payments"] });
+    },
+  });
+
+  const invoiceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/payments/${id}/generate-invoice`);
+      return res.data;
+    },
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["payment", id] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      const invoiceId = (result as PaymentDetail)?.invoice?.id;
+      if (invoiceId) router.push(`/invoices/${invoiceId}`);
+    },
+  });
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+  if (error || !data) {
+    return <p className="text-sm text-red-500">Payment not found</p>;
+  }
+
+  const mutationError =
+    verifyMutation.isError
+      ? getApiErrorMessage(verifyMutation.error, "Verification failed")
+      : invoiceMutation.isError
+        ? getApiErrorMessage(invoiceMutation.error, "Invoice generation failed")
+        : null;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={String(data.customer?.companyName ?? "Collection")}
+        description={`${formatLabel(String(data.status ?? ""))} · ${formatMoney(data.paidAmount)}`}
+        action={
+          <Link href="/payments" className="text-sm text-primary hover:underline">
+            ← Back to collections
+          </Link>
+        }
+      />
+
+      {mutationError ? (
+        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600">{mutationError}</p>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {data.invoice?.id ? (
+          <button
+            type="button"
+            onClick={() => router.push(`/invoices/${data.invoice!.id}`)}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            View invoice {data.invoice.invoiceNumber}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => invoiceMutation.mutate()}
+            disabled={invoiceMutation.isPending}
+            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
+          >
+            {invoiceMutation.isPending ? "Generating…" : "Generate invoice"}
+          </button>
+        )}
+        {adminView && !data.verifiedAt ? (
+          <button
+            type="button"
+            onClick={() => verifyMutation.mutate()}
+            disabled={verifyMutation.isPending}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
+          >
+            {verifyMutation.isPending ? "Verifying…" : "Verify collection"}
+          </button>
+        ) : null}
+      </div>
+
+      <GlassCard className="p-4">
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">Amount</dt>
+            <dd className="font-semibold">{formatMoney(data.paidAmount)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Status</dt>
+            <dd>{formatLabel(String(data.status ?? "—"))}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Method</dt>
+            <dd>{data.paymentMethod ? formatLabel(String(data.paymentMethod)) : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Collected on</dt>
+            <dd>{formatDate(data.collectedAt ?? data.createdAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Recorded by</dt>
+            <dd>{String(data.createdBy?.name ?? "—")}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Transaction ID</dt>
+            <dd>{String(data.transactionId ?? "—")}</dd>
+          </div>
+          {data.verifiedAt ? (
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">Verified</dt>
+              <dd>
+                {formatDate(data.verifiedAt)} by {String(data.verifiedBy?.name ?? "admin")}
+              </dd>
+            </div>
+          ) : null}
+          {data.notes ? (
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">Notes</dt>
+              <dd>{String(data.notes)}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </GlassCard>
+
+      {data.proofUrl ? (
+        <GlassCard className="p-4">
+          <p className="mb-3 text-sm font-medium">Payment proof</p>
+          {String(data.proofMimeType ?? "").startsWith("image/") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={String(data.proofUrl)} alt="Payment proof" className="max-h-96 rounded-lg border border-border" />
+          ) : (
+            <a
+              href={String(data.proofUrl)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Open proof document
+            </a>
+          )}
+        </GlassCard>
+      ) : null}
+    </div>
+  );
+}
