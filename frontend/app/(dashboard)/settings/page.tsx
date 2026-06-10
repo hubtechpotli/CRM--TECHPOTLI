@@ -181,6 +181,9 @@ export default function SettingsPage() {
                   <input type="checkbox" checked={force2FA} onChange={(e) => setForce2FA(e.target.checked)} />
                   Require two-factor authentication for all users
                 </label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  All employees and admins must set up 2FA on first login. This setting adds the same requirement for any other roles.
+                </p>
               </FormField>
             </div>
             <div className="flex justify-end">

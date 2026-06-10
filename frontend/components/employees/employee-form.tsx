@@ -180,7 +180,7 @@ export function EmployeeForm({
           <FormField label="Password" className="sm:col-span-2">
             <PasswordInput value={form.password} onChange={(v) => set("password", v)} required />
             <p className="mt-1 text-xs text-muted-foreground">
-              Min 8 chars with uppercase, number, and special character
+              Min 8 chars with uppercase, number, and special character. On first login they must set up two-factor authentication (authenticator app).
             </p>
           </FormField>
         ) : null}
@@ -218,7 +218,7 @@ export function EmployeeForm({
                 ]}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Lets this employee sign in from outside the office network. Enabling 2FA is strongly recommended for remote access.
+                Lets this employee sign in from outside the office network. Two-factor authentication is required for all employees on first login.
               </p>
             </FormField>
           </>

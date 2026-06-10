@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { SessionService } from '../redis/session.service';
@@ -74,6 +75,15 @@ export class AuthService {
     private ipAccess: IpAccessService,
   ) {}
 
+  /** Every employee and admin must complete 2FA enrollment before accessing the CRM. */
+  private mustEnroll2FA(role: string): boolean {
+    return (
+      role === UserRole.EMPLOYEE ||
+      role === UserRole.ADMIN ||
+      role === UserRole.SUPER_ADMIN
+    );
+  }
+
   async login(email: string, password: string, ip: string, userAgent: string): Promise<AuthResult> {
     const lockKey = `login:lock:${email.toLowerCase()}`;
     if (await this.redis.get(lockKey)) {
@@ -117,11 +127,14 @@ export class AuthService {
 
     const settings = await this.prisma.systemSettings.findUnique({ where: { id: 'default' } });
     const force2FA = settings?.force2FA ?? false;
+    const needsEnrollment =
+      !user!.twoFactorEnabled &&
+      (this.mustEnroll2FA(user!.role) || force2FA);
 
-    if (force2FA && !user!.twoFactorEnabled) {
+    if (needsEnrollment) {
       return {
         requires2FASetup: true,
-        setupToken: this.createFlowToken(user!.id, '2fa-enroll', '15m'),
+        setupToken: this.createFlowToken(user!.id, '2fa-enroll', '30m'),
       };
     }
 
@@ -198,10 +211,25 @@ export class AuthService {
 
   async confirm2faEnroll(setupToken: string, code: string, ip: string, userAgent: string): Promise<AuthResult> {
     const userId = this.verifyFlowToken(setupToken, '2fa-enroll');
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        twoFactorSecret: true,
+        allowRemoteAccess: true,
+        allowedIPs: true,
+        mustChangePassword: true,
+      },
+    });
     if (!user?.isActive || !user.twoFactorSecret) {
       throw new BadRequestException('Setup expired. Start again.');
     }
+
+    await this.ipAccess.assertLoginAllowed(user, ip);
 
     const secret = this.encryption.decrypt(user.twoFactorSecret);
     const ok = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });

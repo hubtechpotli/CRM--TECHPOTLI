@@ -5,7 +5,6 @@ import { ipMatchesCidr, normalizeClientIp, parseEnvOfficeCidrs } from '../utils/
 type LoginUser = {
   id: string;
   allowRemoteAccess: boolean;
-  twoFactorEnabled: boolean;
   allowedIPs: string[];
 };
 

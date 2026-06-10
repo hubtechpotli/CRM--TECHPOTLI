@@ -36,6 +36,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
     if (!user?.isActive) throw new UnauthorizedException('Session expired');
+    if (!user.twoFactorEnabled) {
+      throw new UnauthorizedException('Two-factor authentication required. Please sign in again.');
+    }
 
     const session = await this.prisma.userSession.findFirst({
       where: { id: payload.sid, userId: payload.sub, expiresAt: { gt: new Date() } },
