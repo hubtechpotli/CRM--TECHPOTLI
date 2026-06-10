@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,8 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Modal } from "@/components/ui/modal";
 import { PaymentForm } from "@/components/payments/payment-form";
 import { isTempId } from "@/lib/optimistic-mutation";
+import { useSocket } from "@/lib/socket-provider";
+import { Loader2 } from "lucide-react";
 
 type LineItem = { name: string; qty: number; rate: number; amount: number };
 
@@ -30,7 +32,9 @@ export default function InvoiceDetailPage() {
   const params = useParams();
   const id = String(params.id);
   const queryClient = useQueryClient();
+  const socket = useSocket();
   const [showRecordPayment, setShowRecordPayment] = useState(false);
+  const [pdfPending, setPdfPending] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["invoice", id],
@@ -52,13 +56,52 @@ export default function InvoiceDetailPage() {
     },
   });
 
+  const { data: pdfStatus } = useQuery({
+    queryKey: ["invoice-pdf-status", id],
+    queryFn: async () => {
+      const res = await api.get<{ status: string }>(`/invoices/${id}/pdf-status`);
+      return res.data;
+    },
+    enabled: !isTempId(id) && (pdfPending || !data?.pdfViewUrl),
+    refetchInterval: pdfPending || !data?.pdfViewUrl ? 2000 : false,
+  });
+
+  useEffect(() => {
+    if (!socket || isTempId(id)) return;
+    const onReady = (payload: { invoiceId?: string }) => {
+      if (payload.invoiceId === id) {
+        setPdfPending(false);
+        void queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      }
+    };
+    socket.on("invoice:pdf_ready", onReady);
+    return () => {
+      socket.off("invoice:pdf_ready", onReady);
+    };
+  }, [socket, id, queryClient]);
+
+  useEffect(() => {
+    if (pdfStatus?.status === "ready") {
+      setPdfPending(false);
+      void queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+    }
+  }, [pdfStatus?.status, id, queryClient]);
+
+  useEffect(() => {
+    if (data && !data.pdfViewUrl) setPdfPending(true);
+    if (data?.pdfViewUrl) setPdfPending(false);
+  }, [data?.pdfViewUrl, data]);
+
   const regeneratePdfMutation = useMutation({
     mutationFn: async () => {
       const res = await api.post(`/invoices/${id}/regenerate-pdf`);
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+    onSuccess: (result) => {
+      if ((result as { pdfStatus?: string; status?: string })?.pdfStatus === "queued" || (result as { status?: string })?.status === "queued") {
+        setPdfPending(true);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["invoice", id] });
     },
   });
 
@@ -139,11 +182,21 @@ export default function InvoiceDetailPage() {
             ) : (
               <button
                 type="button"
-                onClick={() => regeneratePdfMutation.mutate()}
-                disabled={regeneratePdfMutation.isPending}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
+                onClick={() => {
+                  setPdfPending(true);
+                  regeneratePdfMutation.mutate();
+                }}
+                disabled={regeneratePdfMutation.isPending || pdfPending}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
               >
-                {regeneratePdfMutation.isPending ? "Generating…" : "Generate PDF"}
+                {regeneratePdfMutation.isPending || pdfPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Generating PDF…
+                  </>
+                ) : (
+                  "Generate PDF"
+                )}
               </button>
             )}
             <Link href="/invoices" className="text-sm text-primary hover:underline">

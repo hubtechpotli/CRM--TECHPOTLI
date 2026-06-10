@@ -8,13 +8,30 @@ import { api } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { useAuthReady } from "@/hooks/use-auth-ready";
+import dynamic from "next/dynamic";
 import { KpiSparklineCard } from "@/components/dashboard/kpi-sparkline-card";
-import { LeadsOverviewChart } from "@/components/dashboard/leads-overview-chart";
-import { LeadSourceChart } from "@/components/dashboard/lead-source-chart";
-import { RecentLeadsPanel } from "@/components/dashboard/recent-leads-panel";
-import { ActivitySidebar } from "@/components/dashboard/activity-sidebar";
-import { TopSalespeople } from "@/components/dashboard/top-salespeople";
 import { TeamUpdatesPanel } from "@/components/dashboard/team-updates-panel";
+
+const LeadsOverviewChart = dynamic(
+  () => import("@/components/dashboard/leads-overview-chart").then((m) => m.LeadsOverviewChart),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-2xl bg-muted/40" /> },
+);
+const LeadSourceChart = dynamic(
+  () => import("@/components/dashboard/lead-source-chart").then((m) => m.LeadSourceChart),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-2xl bg-muted/40" /> },
+);
+const RecentLeadsPanel = dynamic(
+  () => import("@/components/dashboard/recent-leads-panel").then((m) => m.RecentLeadsPanel),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-2xl bg-muted/40" /> },
+);
+const ActivitySidebar = dynamic(
+  () => import("@/components/dashboard/activity-sidebar").then((m) => m.ActivitySidebar),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-2xl bg-muted/40" /> },
+);
+const TopSalespeople = dynamic(
+  () => import("@/components/dashboard/top-salespeople").then((m) => m.TopSalespeople),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-2xl bg-muted/40" /> },
+);
 
 type CrmInsights = {
   kpis: {
@@ -54,6 +71,18 @@ type ActivityItem = {
   recordId?: string | null;
   createdAt: string;
   user?: { name: string; email: string } | null;
+};
+
+type DashboardLeadRow = Record<string, unknown> & {
+  id: string;
+  companyName?: string;
+  contactName?: string;
+  phone?: string;
+  status?: string;
+  priority?: string;
+  updatedAt?: string;
+  assignedTo?: { name?: string };
+  activities?: Array<{ createdAt: string }>;
 };
 
 export default function DashboardPage() {
@@ -210,7 +239,7 @@ export default function DashboardPage() {
             />
           </div>
           <RecentLeadsPanel
-            leads={filteredLeads as Parameters<typeof RecentLeadsPanel>[0]["leads"]}
+            leads={filteredLeads as DashboardLeadRow[]}
             loading={isLoading}
             statusFilter={statusFilter}
             onStatusChange={setStatusFilter}

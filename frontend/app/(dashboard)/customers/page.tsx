@@ -21,6 +21,8 @@ import { useAuthStore } from "@/store/auth-store";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/pagination";
+import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { cn } from "@/lib/utils";
 
 const STATUS_TABS = [
@@ -67,6 +69,7 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebouncedValue(search);
 
   const params = useMemo(
@@ -75,14 +78,14 @@ export default function CustomersPage() {
       status: statusFilter || undefined,
       assignedEmployeeId: assigneeFilter || undefined,
       page,
-      limit: 50,
+      limit: pageSize,
     }),
-    [debouncedSearch, statusFilter, assigneeFilter, page],
+    [debouncedSearch, statusFilter, assigneeFilter, page, pageSize],
   );
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, assigneeFilter]);
+  }, [debouncedSearch, statusFilter, assigneeFilter, pageSize]);
 
   useEffect(() => {
     if (searchParams.get("new") === "1") setShowNewCustomer(true);
@@ -96,14 +99,14 @@ export default function CustomersPage() {
 
   const rows = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / 50));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const hasFilters = Boolean(statusFilter || assigneeFilter || search.trim());
 
   return (
     <div className="space-y-5">
       <PageToolbar
         title="Customers"
-        description="Complete list sorted by join date & time (oldest first). Click any row to open the full profile."
+        description="Customer directory sorted newest first. Click any row to open the full profile."
         search={
           <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -137,7 +140,7 @@ export default function CustomersPage() {
         <div>
           <p className="text-sm font-semibold">{total} customers</p>
           <p className="text-xs text-muted-foreground">
-            Page {page} of {totalPages} · sorted oldest to newest
+            Page {page} of {totalPages} · sorted newest first
           </p>
         </div>
       </div>
@@ -204,29 +207,20 @@ export default function CustomersPage() {
                   : undefined
               }
             />
-            {totalPages > 1 ? (
-              <div className="flex items-center justify-between border-t border-border/50 px-4 py-3">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-muted-foreground">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            ) : null}
+            <PaginationFooter
+              page={page}
+              totalPages={totalPages}
+              totalCount={total}
+              limit={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                if (PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])) {
+                  setPageSize(size);
+                  setPage(1);
+                }
+              }}
+              className="border-t border-border/50 px-4 py-3"
+            />
           </div>
         )}
       </SectionCard>

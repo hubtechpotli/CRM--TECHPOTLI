@@ -108,3 +108,4 @@ techpotli-os/
   frontend/    Next.js dashboard + client portal
   docs/        Setup and guides
 ```
+

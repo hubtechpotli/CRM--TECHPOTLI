@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider, keepPreviousData } from "@tanstack/re
 import { useState } from "react";
 import { Toaster } from "sonner";
 import { queryRetryDelay, shouldRetryQuery } from "@/lib/query-retry";
+import { SocketProvider } from "@/lib/socket-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -27,8 +28,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
-      <Toaster position="bottom-right" richColors closeButton />
+      <SocketProvider>
+        {children}
+        <Toaster position="bottom-right" richColors closeButton />
+      </SocketProvider>
     </QueryClientProvider>
   );
 }

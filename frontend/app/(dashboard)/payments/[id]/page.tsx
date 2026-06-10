@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
@@ -15,6 +16,7 @@ import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import { useAuthStore } from "@/store/auth-store";
 import { isAdmin } from "@/lib/roles";
+import { DocumentPreviewModal } from "@/components/ui/document-preview-modal";
 
 type PaymentDetail = Record<string, unknown> & {
   customer?: { id?: string; companyName?: string };
@@ -22,6 +24,8 @@ type PaymentDetail = Record<string, unknown> & {
   createdBy?: { name?: string };
   verifiedBy?: { name?: string };
   proofUrl?: string | null;
+  proofS3Key?: string | null;
+  proofMimeType?: string | null;
 };
 
 export default function PaymentDetailPage() {
@@ -31,6 +35,7 @@ export default function PaymentDetailPage() {
   const id = String(params.id);
   const { authReady } = useAuthReady();
   const adminView = isAdmin(useAuthStore((s) => s.user?.role));
+  const [showProof, setShowProof] = useState(false);
 
   const { data, isLoading, isFetching, error, failureCount } = useQuery({
     queryKey: ["payment", id],
@@ -200,24 +205,26 @@ export default function PaymentDetailPage() {
         </dl>
       </GlassCard>
 
-      {data.proofUrl ? (
+      {data.proofS3Key ? (
         <GlassCard className="p-4">
           <p className="mb-3 text-sm font-medium">Payment proof</p>
-          {String(data.proofMimeType ?? "").startsWith("image/") ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={String(data.proofUrl)} alt="Payment proof" className="max-h-96 rounded-lg border border-border" />
-          ) : (
-            <a
-              href={String(data.proofUrl)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
-            >
-              Open proof document
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowProof(true)}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            View payment proof
+          </button>
         </GlassCard>
       ) : null}
+
+      <DocumentPreviewModal
+        open={showProof}
+        onClose={() => setShowProof(false)}
+        title="Payment proof"
+        s3Key={String(data.proofS3Key ?? "")}
+        mimeType={String(data.proofMimeType ?? "")}
+      />
     </div>
   );
 }

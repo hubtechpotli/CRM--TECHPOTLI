@@ -4,11 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { io, Socket } from "socket.io-client";
 import { Building2, MessageSquare, X } from "lucide-react";
 import { invalidateTeamUpdates } from "@/lib/team-updates";
-import { getWsUrl } from "@/lib/ws-url";
-import { useAuthStore } from "@/store/auth-store";
+import { useSocket } from "@/lib/socket-provider";
 
 type WorkItemToast = {
   id: string;
@@ -18,17 +16,14 @@ type WorkItemToast = {
   createdBy?: { name?: string };
 };
 
-const wsUrl = getWsUrl();
-
 export function TeamUpdateToast() {
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const socket = useSocket();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [toasts, setToasts] = useState<WorkItemToast[]>([]);
 
   useEffect(() => {
-    if (!accessToken) return;
-    const socket: Socket = io(wsUrl, { auth: { token: accessToken } });
+    if (!socket) return;
 
     const onWorkItem = (payload: WorkItemToast) => {
       invalidateTeamUpdates(queryClient);
@@ -40,15 +35,12 @@ export function TeamUpdateToast() {
       }, 8000);
     };
 
-    socket.on("work_item:new", (data: WorkItemToast) => {
-      onWorkItem(data);
-    });
+    socket.on("work_item:new", onWorkItem);
 
     return () => {
-      socket.off("work_item:new");
-      socket.disconnect();
+      socket.off("work_item:new", onWorkItem);
     };
-  }, [accessToken, queryClient]);
+  }, [socket, queryClient]);
 
   function dismiss(id: string) {
     setToasts((prev) => prev.filter((t) => t.id !== id));

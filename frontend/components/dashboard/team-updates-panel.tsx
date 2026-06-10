@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, MessageSquare, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthReady } from "@/hooks/use-auth-ready";
-import type { GlobalWorkItem, TeamUpdatesSummary } from "@/lib/team-updates";
+import type { GlobalWorkItem, TeamFeedResponse, TeamUpdatesSummary } from "@/lib/team-updates";
+import { normalizePaginated } from "@/lib/pagination";
 import { formatDateTime, formatLabel } from "@/lib/format";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { cn } from "@/lib/utils";
@@ -23,15 +24,19 @@ export function TeamUpdatesPanel({ highlighted = false }: { highlighted?: boolea
     refetchInterval: 60_000,
   });
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: feedPage, isLoading } = useQuery({
     queryKey: ["team-updates-feed", "dashboard", 5],
     queryFn: async () => {
-      const res = await api.get<GlobalWorkItem[]>("/team-updates/feed", { params: { take: 5 } });
-      return Array.isArray(res.data) ? res.data : [];
+      const res = await api.get<TeamFeedResponse | GlobalWorkItem[]>("/team-updates/feed", {
+        params: { limit: 5, page: 1 },
+      });
+      return normalizePaginated<GlobalWorkItem>(res.data);
     },
     enabled: authReady,
     refetchInterval: 60_000,
   });
+
+  const items = feedPage?.data ?? [];
 
   const hasOpen = (summary?.openTotal ?? 0) > 0;
   const showHighlight = highlighted || hasOpen;
