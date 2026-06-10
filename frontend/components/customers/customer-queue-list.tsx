@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PremiumDataTable } from "@/components/dashboard/premium-data-table";
+import { PremiumDataTable, type RowAction } from "@/components/dashboard/premium-data-table";
 import { CompanyAvatar } from "@/components/leads/lead-badges";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
@@ -54,11 +54,13 @@ export function CustomerListTable({
   loading,
   showAssignee = false,
   emptyMessage,
+  rowActions,
 }: {
   rows: CustomerRow[];
   loading?: boolean;
   showAssignee?: boolean;
   emptyMessage?: string;
+  rowActions?: (row: CustomerRow) => RowAction<CustomerRow>[];
 }) {
   const router = useRouter();
 
@@ -72,6 +74,7 @@ export function CustomerListTable({
       loading={loading}
       rows={numberedRows}
       onRowClick={(row) => router.push(`/customers/${row.id}`)}
+      rowActions={rowActions}
       emptyState={
         <div className="py-14 text-center">
           <p className="font-medium text-foreground">No customers found</p>

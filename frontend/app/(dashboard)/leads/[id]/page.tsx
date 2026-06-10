@@ -31,7 +31,8 @@ import { QuotationForm } from "@/components/quotations/quotation-form";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
-import { isAdmin } from "@/lib/roles";
+import { isAdmin, isSuperAdmin } from "@/lib/roles";
+import { Trash2 } from "lucide-react";
 import { formatLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -70,6 +71,7 @@ export default function LeadDetailPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const adminView = isAdmin(user?.role);
+  const canDelete = isSuperAdmin(user?.role);
   const { data: assignees = [] } = useAssignees();
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -214,6 +216,13 @@ export default function LeadDetailPage() {
       invalidate();
       router.push(`/customers/${customer.id}?newProject=1`);
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await api.delete(`/leads/${id}`);
+    },
+    onSuccess: () => router.push("/leads"),
   });
 
   if (isTempId(id)) {
@@ -369,6 +378,19 @@ export default function LeadDetailPage() {
                       >
                         <XCircle className="h-3.5 w-3.5" /> Mark lost
                       </button>
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMore(false);
+                            if (window.confirm("Delete this lead permanently?")) deleteMutation.mutate();
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete lead
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

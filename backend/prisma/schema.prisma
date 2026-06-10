@@ -357,7 +357,9 @@ model User {
   acceptedWorkOrders       WorkOrder[]
   createdInvoices          Invoice[]
   createdQuotations        Quotation[]
-  createdPayments          Payment[]
+  createdPayments          Payment[]            @relation("PaymentCreator")
+  verifiedPayments         Payment[]            @relation("PaymentVerifier")
+  userNotes                UserNote[]
   createdExpenses          Expense[]            @relation("ExpensePayer")
   assignedTickets          SupportTicket[]      @relation("TicketAssignee")
   createdTickets           SupportTicket[]      @relation("TicketCreator")
@@ -1102,19 +1104,43 @@ model Payment {
   paidDate      DateTime?
   dueDate       DateTime?
   notes         String?
+  proofS3Key    String?
+  proofFilename String?
+  proofMimeType String?
+  collectedAt   DateTime?
+  verifiedAt    DateTime?
+  verifiedById  String?
   createdById   String
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  customer  Customer @relation(fields: [customerId], references: [id])
-  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  createdBy User     @relation(fields: [createdById], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
+  invoice    Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdBy  User     @relation("PaymentCreator", fields: [createdById], references: [id])
+  verifiedBy User?    @relation("PaymentVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([invoiceId])
   @@index([status])
   @@index([dueDate])
   @@index([status, paidDate])
+  @@index([createdById, collectedAt(sort: Desc)])
+  @@index([collectedAt(sort: Desc)])
+  @@index([createdById, status])
+}
+
+model UserNote {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("Untitled")
+  body      String   @default("")
+  isDraft   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 model Renewal {

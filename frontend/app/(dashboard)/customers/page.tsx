@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { api } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { fetchCustomersDirectory } from "@/lib/customers-directory";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,7 +18,7 @@ import { SelectInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { useAssignees } from "@/hooks/use-users";
 import { useAuthStore } from "@/store/auth-store";
-import { isAdmin } from "@/lib/roles";
+import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 
@@ -30,8 +32,32 @@ const STATUS_TABS = [
 export default function CustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const adminView = isAdmin(user?.role);
+  const canDelete = isSuperAdmin(user?.role);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const deleteMutation = useOptimisticMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/customers/${id}`);
+    },
+    snapshotKeys: [["customers-directory"]],
+    invalidateKeys: [["customers-directory"], ["customers"]],
+    onMutate: () => setDeleteError(null),
+    onError: (err) => {
+      setDeleteError(getApiErrorMessage(err, "Failed to delete customer"));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customers-directory"] });
+    },
+  });
+
+  function handleDeleteCustomer(row: CustomerRow) {
+    const name = String(row.companyName ?? "this customer");
+    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
+    deleteMutation.mutate(String(row.id));
+  }
   const { data: assignees = [] } = useAssignees();
 
   const [search, setSearch] = useState("");
@@ -99,6 +125,10 @@ export default function CustomersPage() {
         }
       />
 
+      {deleteError ? (
+        <p className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+      ) : null}
+
       <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
         <Users className="h-5 w-5 text-primary" />
         <div>
@@ -159,6 +189,17 @@ export default function CustomersPage() {
               loading={isLoading}
               showAssignee={adminView}
               emptyMessage="No customers match your search. Add a new customer to get started."
+              rowActions={
+                canDelete
+                  ? (row) => [
+                      {
+                        label: "Delete",
+                        destructive: true,
+                        onClick: () => handleDeleteCustomer(row),
+                      },
+                    ]
+                  : undefined
+              }
             />
             {totalPages > 1 ? (
               <div className="flex items-center justify-between border-t border-border/50 px-4 py-3">

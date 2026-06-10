@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { isTempId } from "@/lib/optimistic-mutation";
@@ -16,6 +16,9 @@ import { CustomerProfileSections } from "@/components/customers/customer-profile
 import { ProjectForm } from "@/components/projects/project-form";
 import { Modal } from "@/components/ui/modal";
 import { CardSkeleton, CustomerDetailSkeleton } from "@/components/ui/skeleton";
+import { useAuthStore } from "@/store/auth-store";
+import { isSuperAdmin } from "@/lib/roles";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 const CustomerServicesPanel = dynamic(
   () => import("@/components/customers/customer-services-panel").then((m) => m.CustomerServicesPanel),
@@ -112,6 +115,9 @@ export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const canDelete = isSuperAdmin(user?.role);
   const id = String(params.id);
   const [tab, setTab] = useState<Tab>("overview");
   const [showProject, setShowProject] = useState(false);
@@ -167,6 +173,19 @@ export default function CustomerDetailPage() {
     },
     onError: () => {
       setFavorited((prev) => !prev);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await api.delete(`/customers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      router.push("/customers");
+    },
+    onError: (err) => {
+      window.alert(getApiErrorMessage(err, "Failed to delete customer"));
     },
   });
 
@@ -228,6 +247,20 @@ export default function CustomerDetailPage() {
             >
               + Add Project
             </button>
+            {canDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Delete this customer permanently? This cannot be undone.")) {
+                    deleteMutation.mutate();
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:hover:bg-red-950/30"
+              >
+                {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              </button>
+            ) : null}
             <Link href="/customers" className="text-sm text-primary hover:underline">
               ← Back
             </Link>
