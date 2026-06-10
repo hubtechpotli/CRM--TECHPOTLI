@@ -132,7 +132,7 @@ export class AuthService {
       !user!.twoFactorEnabled &&
       (this.mustEnroll2FA(user!.role) || force2FA);
 
-    if (needsEnrollment) {
+    if (needsEnrollment || (user!.twoFactorEnabled && !user!.twoFactorSecret)) {
       return {
         requires2FASetup: true,
         setupToken: this.createFlowToken(user!.id, '2fa-enroll', '30m'),
@@ -142,7 +142,7 @@ export class AuthService {
     if (user!.twoFactorEnabled && user!.twoFactorSecret) {
       return {
         requires2FA: true,
-        tempToken: this.createFlowToken(user!.id, '2fa-verify', '5m'),
+        tempToken: this.createFlowToken(user!.id, '2fa-verify', '10m'),
       };
     }
 

@@ -69,7 +69,7 @@ export default function TwoFactorVerifyPage() {
           Verify your identity
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enter the 6-digit code from your authenticator app
+          Required every time you sign in. Open Google Authenticator or Authy and enter the current 6-digit code.
         </p>
       </div>
       <form onSubmit={onSubmit} className="space-y-4">
