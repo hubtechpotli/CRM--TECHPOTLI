@@ -250,23 +250,116 @@ export class CustomersService {
     return note;
   }
 
-  getTimeline(customerId: string) {
-    return this.prisma.customerTimelineEvent.findMany({
-      where: { customerId },
-      include: { user: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+  async getTimeline(
+    customerId: string,
+    opts?: { limit?: number; cursor?: string; page?: number },
+  ) {
+    const limit = Math.min(opts?.limit ?? parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10), 100);
+    const page = Math.max(1, opts?.page ?? 1);
+    const where: Prisma.CustomerTimelineEventWhereInput = { customerId };
+
+    if (opts?.cursor) {
+      const [createdAt, id] = opts.cursor.split('|');
+      const cursorDate = new Date(createdAt);
+      if (!Number.isNaN(cursorDate.getTime()) && id) {
+        where.OR = [
+          { createdAt: { lt: cursorDate } },
+          { createdAt: cursorDate, id: { lt: id } },
+        ];
+      }
+    }
+
+    const skip = opts?.cursor ? 0 : (page - 1) * limit;
+
+    const [totalCount, rows] = await Promise.all([
+      this.prisma.customerTimelineEvent.count({ where: { customerId } }),
+      this.prisma.customerTimelineEvent.findMany({
+        where,
+        include: { user: { select: { id: true, name: true } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        skip,
+      }),
+    ]);
+
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
+    const last = data[data.length - 1];
+    const nextCursor =
+      hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : null;
+
+    return {
+      data,
+      totalCount,
+      page,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+      limit,
+      nextCursor,
+      hasMore,
+    };
   }
 
-  listWorkItems(customerId: string, filters?: { status?: CustomerWorkItemStatus; mine?: string }) {
+  async listWorkItems(
+    customerId: string,
+    filters?: {
+      status?: CustomerWorkItemStatus;
+      mine?: string;
+      limit?: number;
+      page?: number;
+      cursor?: string;
+    },
+  ) {
     const where: Prisma.CustomerWorkItemWhereInput = { customerId };
     if (filters?.status) where.status = filters.status;
     if (filters?.mine) where.OR = [{ createdById: filters.mine }, { assignedToId: filters.mine }];
-    return this.prisma.customerWorkItem.findMany({
-      where,
-      include: this.workItemInclude,
-      orderBy: { createdAt: 'desc' },
-    });
+
+    const limit = Math.min(filters?.limit ?? parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10), 100);
+    const page = Math.max(1, filters?.page ?? 1);
+
+    if (filters?.cursor) {
+      const [createdAt, id] = filters.cursor.split('|');
+      const cursorDate = new Date(createdAt);
+      if (!Number.isNaN(cursorDate.getTime()) && id) {
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+          {
+            OR: [
+              { createdAt: { lt: cursorDate } },
+              { createdAt: cursorDate, id: { lt: id } },
+            ],
+          },
+        ];
+      }
+    }
+
+    const skip = filters?.cursor ? 0 : (page - 1) * limit;
+
+    const [totalCount, rows] = await Promise.all([
+      this.prisma.customerWorkItem.count({ where }),
+      this.prisma.customerWorkItem.findMany({
+        where,
+        include: this.workItemInclude,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        skip,
+      }),
+    ]);
+
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
+    const last = data[data.length - 1];
+    const nextCursor =
+      hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : null;
+
+    return {
+      data,
+      totalCount,
+      page,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+      limit,
+      nextCursor,
+      hasMore,
+    };
   }
 
   async createWorkItem(
@@ -310,6 +403,7 @@ export class CustomersService {
 
     void this.notifyWorkItemAssignment(item, userId, 'created');
     void this.broadcastWorkItem(item, customer.companyName);
+    void this.cache.bumpNamespace('team-updates');
     return item;
   }
 
@@ -378,6 +472,7 @@ export class CustomersService {
         select: { companyName: true },
       });
       void this.broadcastWorkItem(updated, customer?.companyName ?? 'Customer');
+      void this.cache.bumpNamespace('team-updates');
     }
     return updated;
   }
@@ -435,6 +530,7 @@ export class CustomersService {
         select: { companyName: true },
       });
       void this.broadcastWorkItem(result, customer?.companyName ?? 'Customer');
+      void this.cache.bumpNamespace('team-updates');
     }
     return result;
   }

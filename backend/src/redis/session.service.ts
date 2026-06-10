@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from './redis.service';
 
 const SESSION_PREFIX = 'session:';
+const SESSION_CTX_PREFIX = 'session:ctx:';
 const SESSION_TTL = 7 * 24 * 60 * 60;
+const SESSION_CTX_TTL = 14 * 60;
 
 @Injectable()
 export class SessionService {
@@ -29,9 +31,28 @@ export class SessionService {
     return stored === userId;
   }
 
+  async getSessionContext<T>(sessionId: string): Promise<T | null> {
+    const raw = await this.redis.get(`${SESSION_CTX_PREFIX}${sessionId}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  async setSessionContext(sessionId: string, ctx: unknown): Promise<void> {
+    await this.redis.set(`${SESSION_CTX_PREFIX}${sessionId}`, JSON.stringify(ctx), SESSION_CTX_TTL);
+  }
+
+  async clearSessionContext(sessionId: string): Promise<void> {
+    await this.redis.del(`${SESSION_CTX_PREFIX}${sessionId}`);
+  }
+
   async revokeSession(sessionId: string, userId: string): Promise<void> {
     await this.redis.del(`${SESSION_PREFIX}${sessionId}`);
     await this.redis.del(`${SESSION_PREFIX}user:${userId}:${sessionId}`);
+    await this.clearSessionContext(sessionId);
   }
 
   async revokeAllUserSessions(userId: string): Promise<void> {

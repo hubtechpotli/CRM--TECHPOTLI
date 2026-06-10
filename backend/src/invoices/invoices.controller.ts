@@ -9,13 +9,31 @@ export class InvoicesController {
   constructor(private invoices: InvoicesService) {}
 
   @Get()
-  findAll(@Query('customerId') customerId?: string) {
-    return customerId ? this.invoices.findByCustomer(customerId) : this.invoices.findAll();
+  findAll(
+    @Query('customerId') customerId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (customerId) return this.invoices.findByCustomer(customerId);
+    return this.invoices.findAll({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get(':id/pdf-status')
+  pdfStatus(@Param('id') id: string) {
+    return this.invoices.getPdfStatus(id);
+  }
+
+  @Post(':id/generate-pdf')
+  generatePdf(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.invoices.enqueuePdfGeneration(id, user.sub);
   }
 
   @Post(':id/regenerate-pdf')
-  regeneratePdf(@Param('id') id: string) {
-    return this.invoices.regeneratePdf(id);
+  regeneratePdf(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.invoices.regeneratePdf(id, user.sub);
   }
 
   @Get(':id')

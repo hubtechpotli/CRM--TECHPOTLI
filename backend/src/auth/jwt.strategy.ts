@@ -7,6 +7,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SessionService } from '../redis/session.service';
 import { buildSessionClientUpdate } from '../common/utils/session-client.util';
 
+type SessionContext = {
+  sub: string;
+  email: string;
+  role: string;
+  sid: string;
+  mustChangePassword: boolean;
+  allowedIPs: string[];
+  allowRemoteAccess: boolean;
+  twoFactorEnabled: boolean;
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -22,11 +33,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  private sessionCacheEnabled() {
+    return process.env.ENABLE_SESSION_CACHE !== 'false';
+  }
+
   async validate(
     req: Request,
     payload: { sub: string; email: string; role: string; sid?: string },
   ) {
     if (!payload.sid) throw new UnauthorizedException('Session expired');
+
+    if (this.sessionCacheEnabled()) {
+      const cached = await this.sessions.getSessionContext<SessionContext>(payload.sid);
+      if (cached && cached.sub === payload.sub) {
+        const valid = await this.sessions.isSessionValid(payload.sid, payload.sub);
+        if (valid) {
+          void this.touchActivity(payload.sid, req);
+          return cached;
+        }
+      }
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
@@ -51,26 +77,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
     if (!session) throw new UnauthorizedException('Session expired');
 
-    const ip =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      req.ip ||
-      '127.0.0.1';
-    const userAgent = (req.headers['user-agent'] as string) || 'unknown';
-
     const valid = await this.sessions.isSessionValid(payload.sid, payload.sub);
     if (!valid) throw new UnauthorizedException('Session expired');
 
-    const activityKey = `session:active:${payload.sid}`;
-    const recentlyActive = await this.sessions.getRaw(activityKey);
-    if (!recentlyActive) {
-      await this.prisma.userSession.update({
-        where: { id: payload.sid },
-        data: buildSessionClientUpdate(ip, userAgent),
-      });
-      await this.sessions.setRaw(activityKey, '1', 300);
-    }
+    await this.touchActivity(payload.sid, req);
 
-    return {
+    const ctx: SessionContext = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -80,5 +92,28 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       allowRemoteAccess: user.allowRemoteAccess,
       twoFactorEnabled: user.twoFactorEnabled,
     };
+
+    if (this.sessionCacheEnabled()) {
+      void this.sessions.setSessionContext(payload.sid, ctx);
+    }
+
+    return ctx;
+  }
+
+  private async touchActivity(sessionId: string, req: Request) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.ip ||
+      '127.0.0.1';
+    const userAgent = (req.headers['user-agent'] as string) || 'unknown';
+    const activityKey = `session:active:${sessionId}`;
+    const recentlyActive = await this.sessions.getRaw(activityKey);
+    if (!recentlyActive) {
+      await this.prisma.userSession.update({
+        where: { id: sessionId },
+        data: buildSessionClientUpdate(ip, userAgent),
+      });
+      await this.sessions.setRaw(activityKey, '1', 300);
+    }
   }
 }

@@ -24,12 +24,48 @@ export class ProjectsService {
     await this.cache.bumpNamespace('projects-kanban');
   }
 
-  findAll(filters?: { customerId?: string; status?: ProjectStatus }) {
-    return this.prisma.project.findMany({
-      where: filters,
-      include: { customer: { select: { id: true, companyName: true } }, workOrder: true },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(filters?: {
+    customerId?: string;
+    status?: ProjectStatus;
+    page?: number;
+    limit?: number;
+  }) {
+    const where = {
+      ...(filters?.customerId ? { customerId: filters.customerId } : {}),
+      ...(filters?.status ? { status: filters.status } : {}),
+    };
+
+    if (filters?.customerId && !filters?.page && !filters?.limit) {
+      return this.prisma.project.findMany({
+        where,
+        include: { customer: { select: { id: true, companyName: true } }, workOrder: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    const limit = Math.min(filters?.limit ?? parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10), 100);
+    const page = Math.max(1, filters?.page ?? 1);
+    const skip = (page - 1) * limit;
+
+    const [totalCount, data] = await Promise.all([
+      this.prisma.project.count({ where }),
+      this.prisma.project.findMany({
+        where,
+        include: { customer: { select: { id: true, companyName: true } }, workOrder: true },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+    ]);
+
+    return {
+      data,
+      totalCount,
+      page,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+      limit,
+      hasMore: page * limit < totalCount,
+    };
   }
 
   async kanban() {

@@ -14,8 +14,20 @@ export class AttendanceController {
     @Query('userId') userId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('cursor') cursor?: string,
   ) {
-    return this.attendance.list(userId || user.sub, from ? new Date(from) : undefined, to ? new Date(to) : undefined);
+    return this.attendance.list(
+      userId || user.sub,
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+      {
+        limit: limit ? parseInt(limit, 10) : undefined,
+        page: page ? parseInt(page, 10) : undefined,
+        cursor,
+      },
+    );
   }
 
   @Post('clock-in')

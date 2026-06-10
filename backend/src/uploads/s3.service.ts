@@ -76,6 +76,33 @@ export class S3Service {
     return getSignedUrl(this.client!, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: 3600 });
   }
 
+  usesLocalStorage() {
+    return this.useLocal;
+  }
+
+  async getPresignedUploadUrl(filename: string, mimeType: string, folder = 'files') {
+    const key = `${folder}/${uuidv4()}-${filename}`;
+    if (this.useLocal) {
+      throw new BadGatewayException('Presigned upload requires S3 — use multipart in local dev');
+    }
+    const uploadUrl = await getSignedUrl(
+      this.client!,
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: mimeType }),
+      { expiresIn: 900 },
+    );
+    return { key, uploadUrl, method: 'PUT' as const, headers: { 'Content-Type': mimeType }, local: false };
+  }
+
+  async objectExists(key: string): Promise<boolean> {
+    if (this.useLocal) return this.localFileExists(key);
+    try {
+      await this.client!.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Absolute URL the browser can open (S3 signed URL or backend local file route). */
   async getAccessUrl(key: string) {
     const signed = await this.getSignedUrl(key);

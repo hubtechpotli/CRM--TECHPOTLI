@@ -6,11 +6,27 @@ import { PrismaService } from '../prisma/prisma.service';
 export class RenewalsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.renewal.findMany({
-      include: { customer: { select: { id: true, companyName: true } } },
-      orderBy: { renewalDate: 'asc' },
-    });
+  async findAll(opts?: { page?: number; limit?: number }) {
+    const limit = Math.min(opts?.limit ?? parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10), 100);
+    const page = Math.max(1, opts?.page ?? 1);
+    const skip = (page - 1) * limit;
+    const [totalCount, data] = await Promise.all([
+      this.prisma.renewal.count(),
+      this.prisma.renewal.findMany({
+        include: { customer: { select: { id: true, companyName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+    ]);
+    return {
+      data,
+      totalCount,
+      page,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+      limit,
+      hasMore: page * limit < totalCount,
+    };
   }
 
   findOne(id: string) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RenewalsService } from './renewals.service';
 
@@ -8,8 +8,11 @@ export class RenewalsController {
   constructor(private renewals: RenewalsService) {}
 
   @Get()
-  findAll() {
-    return this.renewals.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.renewals.findAll({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get(':id')
