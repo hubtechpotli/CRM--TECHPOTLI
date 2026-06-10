@@ -6,7 +6,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#b6dff7] p-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-6">
       <AuthBackground />
 
       {/* Login card — centered horizontally & vertically */}

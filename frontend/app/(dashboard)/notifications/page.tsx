@@ -9,10 +9,12 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
+import { SectionCard } from "@/components/dashboard/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
+import { useRouteColor } from "@/hooks/use-route-color";
 
 type Notification = {
   id: string;
@@ -24,6 +26,7 @@ type Notification = {
 };
 
 export default function NotificationsPage() {
+  const routeColor = useRouteColor();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { authReady } = useAuthReady();
@@ -37,6 +40,7 @@ export default function NotificationsPage() {
       return normalizePaginated<Notification>(res.data);
     },
     enabled: authReady,
+    staleTime: 30_000,
   });
 
   const notifications = data?.data ?? [];
@@ -60,31 +64,28 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Notifications"
-        description="Stay on top of leads, projects, invoices, and reminders."
-        action={
-          unread.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => markAllRead()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Mark all read
-            </button>
-          ) : null
-        }
-      />
-
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        unread.length > 0 ? (
+          <button type="button" onClick={() => markAllRead()} className="crm-btn-ghost">
+            <CheckCheck className="h-3.5 w-3.5" />
+            Mark all read
+          </button>
+        ) : null
+      }
+    >
       {isLoading ? (
         <ListPageSkeleton rows={6} columns={1} />
       ) : notifications.length === 0 ? (
-        <GlassCard className="py-12 text-center">
-          <Bell className="mx-auto h-8 w-8 text-muted-foreground/50" />
-          <p className="mt-3 text-sm text-muted-foreground">No notifications yet.</p>
-        </GlassCard>
+        <SectionCard accent={routeColor}>
+          <EmptyState
+            icon={Bell}
+            title="No notifications yet"
+            description="Alerts for leads, projects, invoices, and team mentions will appear here."
+          />
+        </SectionCard>
       ) : (
         <div className="space-y-2">
           {notifications.map((n) => (
@@ -122,6 +123,6 @@ export default function NotificationsPage() {
           />
         </div>
       )}
-    </div>
+    </CrmPageShell>
   );
 }

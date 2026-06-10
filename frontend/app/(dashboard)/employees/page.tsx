@@ -10,17 +10,19 @@ import { formatLabel } from "@/lib/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { useAuthReady } from "@/hooks/use-auth-ready";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
+import { SectionCard } from "@/components/dashboard/section-card";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/dashboard/data-table";
 import { ListActionButton } from "@/components/dashboard/list-actions";
 import { Modal } from "@/components/ui/modal";
 import { EmployeeForm } from "@/components/employees/employee-form";
+import { useRouteColor } from "@/hooks/use-route-color";
 
 type EmployeeRow = Record<string, unknown>;
 
 export default function EmployeesPage() {
+  const routeColor = useRouteColor();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
   const { authReady } = useAuthReady();
@@ -36,6 +38,7 @@ export default function EmployeesPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: 60_000,
   });
 
   const rows = Array.isArray(data) ? data : [];
@@ -65,24 +68,19 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Employees"
-        description="Team members and user accounts."
-        action={
-          <button
-            type="button"
-            onClick={() => setShowNew(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            + New Employee
-          </button>
-        }
-      />
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+          + New Employee
+        </button>
+      }
+    >
       {deleteError ? (
         <p className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
       ) : null}
-      <GlassCard>
+      <SectionCard noPadding accent={routeColor} className="p-4">
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
@@ -133,11 +131,11 @@ export default function EmployeesPage() {
             ]}
           />
         )}
-      </GlassCard>
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="New employee" size="lg">
+      </SectionCard>
+      <Modal open={showNew} onOpenChange={setShowNew} title="New employee" size="lg">
         <EmployeeForm onCancel={() => setShowNew(false)} onSuccess={() => setShowNew(false)} />
       </Modal>
-      <Modal open={!!editEmployee} onClose={() => setEditEmployee(null)} title="Edit employee" size="lg">
+      <Modal open={!!editEmployee} onOpenChange={(v) => !v && setEditEmployee(null)} title="Edit employee" size="lg">
         {editEmployee ? (
           <EmployeeForm
             employee={editEmployee}
@@ -146,6 +144,6 @@ export default function EmployeesPage() {
           />
         ) : null}
       </Modal>
-    </div>
+    </CrmPageShell>
   );
 }

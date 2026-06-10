@@ -32,7 +32,7 @@ export default function QuoteApprovePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-6 dark:from-indigo-950 dark:via-background dark:to-cyan-950">
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <GlassCard className="max-w-md w-full text-center">
         <TechPotliLogo size="md" className="mx-auto" />
         <h1 className="mt-4 text-2xl font-bold">Quotation approval</h1>

@@ -123,11 +123,13 @@ export function RecentLeadsPanel({
   return (
     <SectionCard
       title="Recent Leads"
-      action="View All Leads"
+      subtitle="Click any row to open"
+      compact
+      action="View all"
       actionHref="/leads"
       noPadding
     >
-      <div className="space-y-4 px-5 pt-4">
+      <div className="space-y-2 px-3 pt-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <StatusTabs tabs={TABS} value={statusFilter} onChange={onStatusChange} />
           <Link

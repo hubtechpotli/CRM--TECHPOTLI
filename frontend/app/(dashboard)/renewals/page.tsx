@@ -8,19 +8,22 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
+import { SectionCard } from "@/components/dashboard/section-card";
+import { Plus } from "lucide-react";
 import { DataTable } from "@/components/dashboard/data-table";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
 import { RenewalForm } from "@/components/renewals/renewal-form";
 import { isTempId } from "@/lib/optimistic-mutation";
+import { useRouteColor } from "@/hooks/use-route-color";
 
 type RenewalRow = Record<string, unknown> & {
   customer?: { companyName?: string };
 };
 
 export default function RenewalsPage() {
+  const routeColor = useRouteColor();
   const router = useRouter();
   const [showNew, setShowNew] = useState(false);
   const [page, setPage] = useState(1);
@@ -32,26 +35,23 @@ export default function RenewalsPage() {
       const res = await api.get("/renewals", { params: { page, limit: pageSize } });
       return normalizePaginated<RenewalRow>(res.data);
     },
+    staleTime: 30_000,
   });
 
   const rows = data?.data ?? [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Renewals"
-        description="Domain, hosting, and service renewals."
-        action={
-          <button
-            type="button"
-            onClick={() => setShowNew(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            + New Renewal
-          </button>
-        }
-      />
-      <GlassCard>
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+          <Plus className="h-3.5 w-3.5" />
+          New Renewal
+        </button>
+      }
+    >
+      <SectionCard noPadding accent={routeColor} className="p-4">
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
@@ -117,8 +117,8 @@ export default function RenewalsPage() {
             className="px-4 pb-4"
           />
         ) : null}
-      </GlassCard>
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="New renewal" size="lg">
+      </SectionCard>
+      <Modal open={showNew} onOpenChange={setShowNew} title="New renewal" size="lg">
         <RenewalForm
           onCancel={() => setShowNew(false)}
           onSuccess={(data) => {
@@ -128,6 +128,6 @@ export default function RenewalsPage() {
           }}
         />
       </Modal>
-    </div>
+    </CrmPageShell>
   );
 }

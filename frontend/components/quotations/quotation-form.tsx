@@ -1,12 +1,16 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { CustomerPickerField } from "@/components/ui/customer-picker-field";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { FormFooterActions, FormShell } from "@/components/ui/form-shell";
+import { FormSection } from "@/components/ui/form-section";
+import { FileSpreadsheet } from "lucide-react";
 import { QUOTATION_STATUSES } from "@/lib/types";
 
 type LineItem = { name: string; qty: string; rate: string };
@@ -40,17 +44,6 @@ export function QuotationForm({
   const [status, setStatus] = useState("DRAFT");
   const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()]);
   const [error, setError] = useState<string | null>(null);
-
-  const { data: customers = [] } = useQuery({
-    queryKey: ["customers-directory"],
-    queryFn: async () => {
-      const data = await import("@/lib/customers-directory").then((m) =>
-        m.fetchCustomersDirectory({ limit: 500 }),
-      );
-      return data.items;
-    },
-    enabled: !leadId,
-  });
 
   const mutation = useOptimisticMutation({
     mutationFn: async () => {
@@ -118,23 +111,17 @@ export function QuotationForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit}>
+      <FormShell footer={<FormFooterActions onCancel={onCancel} submitLabel="Create quotation" pending={mutation.isPending} pendingLabel="Creating…" />}>
       {error ? (
-        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : null}
+      <FormSection title="Quote details" icon={FileSpreadsheet} accent="indigo">
       <div className="grid gap-4 sm:grid-cols-2">
         {!leadId ? (
-          <FormField label="Customer" className="sm:col-span-2">
-            <SelectInput
-              value={customerId}
-              onChange={setCustomerId}
-              placeholder="Select customer (optional)"
-              options={customers.map((c) => ({
-                value: String(c.id),
-                label: String(c.companyName ?? c.id),
-              }))}
-            />
-          </FormField>
+          <div className="sm:col-span-2">
+            <CustomerPickerField value={customerId} onChange={setCustomerId} />
+          </div>
         ) : null}
         <FormField label="Client name">
           <TextInput value={clientName} onChange={setClientName} placeholder="Contact or company name" />
@@ -156,14 +143,14 @@ export function QuotationForm({
           />
         </FormField>
       </div>
+      </FormSection>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Line items</span>
+      <FormSection title="Line items">
+        <div className="-mt-1 mb-2 flex justify-end">
           <button
             type="button"
             onClick={() => setLineItems((prev) => [...prev, emptyLineItem()])}
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground"
           >
             + Add item
           </button>
@@ -197,26 +184,12 @@ export function QuotationForm({
             </FormField>
           </div>
         ))}
-      </div>
+      </FormSection>
 
       <FormField label="Notes">
         <TextArea value={notes} onChange={setNotes} placeholder="Optional quotation notes" />
       </FormField>
-
-      <div className="flex justify-end gap-2 pt-2">
-        {onCancel ? (
-          <button type="button" onClick={onCancel} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
-            Cancel
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-indigo-600 disabled:opacity-60"
-        >
-          {mutation.isPending ? "Creating…" : "Create quotation"}
-        </button>
-      </div>
+      </FormShell>
     </form>
   );
 }

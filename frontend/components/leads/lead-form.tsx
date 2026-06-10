@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Briefcase, Target, UserRound } from "lucide-react";
 import { useFormDraft } from "@/hooks/use-form-draft";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
@@ -15,6 +16,8 @@ import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { LEAD_PRIORITIES, LEAD_SOURCES, SERVICE_TYPES } from "@/lib/types";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { FormFooterActions, FormShell } from "@/components/ui/form-shell";
+import { FormSection } from "@/components/ui/form-section";
 import { cn } from "@/lib/utils";
 import { getPriorityMeta } from "@/lib/lead-ui";
 
@@ -59,15 +62,6 @@ function toFormData(lead?: Record<string, unknown>): LeadFormData {
 
 function formatLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function SectionHeader({ title, description }: { title: string; description?: string }) {
-  return (
-    <div className="border-b border-border/60 pb-2">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
-    </div>
-  );
 }
 
 export function LeadForm({
@@ -170,22 +164,29 @@ export function LeadForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex max-h-[70vh] flex-col">
-      <div className="flex-1 space-y-6 overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit}>
+      <FormShell
+        footer={
+          <FormFooterActions
+            onCancel={onCancel}
+            submitLabel={isEdit ? "Update lead" : "Create lead"}
+            pending={mutation.isPending}
+          />
+        }
+      >
         {!isEdit && restored ? (
-          <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
             <span className="text-muted-foreground">Draft restored</span>
-            <button type="button" onClick={discardDraft} className="text-primary hover:underline">
+            <button type="button" onClick={discardDraft} className="font-medium text-foreground hover:underline">
               Discard draft
             </button>
           </div>
         ) : null}
         {error ? (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
         ) : null}
 
-        <section className="space-y-4">
-          <SectionHeader title="Contact" description="Who are you reaching out to?" />
+        <FormSection title="Contact" description="Who are you reaching out to?" icon={UserRound} accent="cyan">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Company name">
               <TextInput value={form.companyName} onChange={(v) => set("companyName", v)} required />
@@ -200,10 +201,9 @@ export function LeadForm({
               <TextInput value={form.email} onChange={(v) => set("email", v)} type="email" />
             </FormField>
           </div>
-        </section>
+        </FormSection>
 
-        <section className="space-y-4">
-          <SectionHeader title="Deal details" description="Source, priority, and budget" />
+        <FormSection title="Deal details" description="Source, priority, and budget" icon={Target} accent="amber">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Source">
               <SelectInput
@@ -212,11 +212,11 @@ export function LeadForm({
                 options={LEAD_SOURCES.map((s) => ({ value: s, label: formatLabel(s) }))}
               />
             </FormField>
-            <FormField label="Budget (₹)" className="sm:col-span-1">
+            <FormField label="Budget (₹)">
               <TextInput value={form.budget} onChange={(v) => set("budget", v)} type="number" placeholder="Optional" />
             </FormField>
           </div>
-          <FormField label="Priority">
+          <FormField label="Priority" className="mt-4">
             <div className="flex flex-wrap gap-2">
               {LEAD_PRIORITIES.map((p) => {
                 const meta = getPriorityMeta(p);
@@ -227,10 +227,10 @@ export function LeadForm({
                     type="button"
                     onClick={() => set("priority", p)}
                     className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                      "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                       selected
-                        ? cn(meta.bg, meta.border, meta.text, "ring-1 ring-primary/30")
-                        : "border-border text-muted-foreground hover:border-primary/40",
+                        ? cn(meta.bg, meta.border, meta.text, "shadow-sm")
+                        : "border-border bg-card text-muted-foreground hover:border-foreground/20",
                     )}
                   >
                     {meta.label}
@@ -239,10 +239,9 @@ export function LeadForm({
               })}
             </div>
           </FormField>
-        </section>
+        </FormSection>
 
-        <section className="space-y-4">
-          <SectionHeader title="Services" description="What are they interested in?" />
+        <FormSection title="Services" description="What are they interested in?" icon={Briefcase} accent="emerald">
           <div className="flex flex-wrap gap-2">
             {SERVICE_TYPES.map((s) => {
               const checked = form.interestedServices.includes(s);
@@ -257,10 +256,10 @@ export function LeadForm({
                     );
                   }}
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                     checked
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40",
+                      ? "border-emerald-400 bg-emerald-100 text-emerald-800 shadow-sm"
+                      : "border-slate-200 bg-white text-muted-foreground hover:border-emerald-300",
                   )}
                 >
                   {formatLabel(s)}
@@ -268,30 +267,11 @@ export function LeadForm({
               );
             })}
           </div>
-          <FormField label="Remarks">
+          <FormField label="Remarks" className="mt-4">
             <TextArea value={form.remarks} onChange={(v) => set("remarks", v)} placeholder="Notes about this lead" />
           </FormField>
-        </section>
-      </div>
-
-      <div className="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-border/60 bg-background/95 pt-4 backdrop-blur-sm">
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
-          >
-            Cancel
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-indigo-600 disabled:opacity-60"
-        >
-          {mutation.isPending ? "Saving…" : isEdit ? "Update lead" : "Create lead"}
-        </button>
-      </div>
+        </FormSection>
+      </FormShell>
     </form>
   );
 }

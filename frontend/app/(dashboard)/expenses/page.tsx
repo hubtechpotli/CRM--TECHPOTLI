@@ -10,19 +10,21 @@ import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { useAuthReady } from "@/hooks/use-auth-ready";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
+import { SectionCard } from "@/components/dashboard/section-card";
 import { DataTable } from "@/components/dashboard/data-table";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { ListActionButton } from "@/components/dashboard/list-actions";
 import { Modal } from "@/components/ui/modal";
 import { ExpenseForm } from "@/components/expenses/expense-form";
+import { useRouteColor } from "@/hooks/use-route-color";
 
 type ExpenseRow = Record<string, unknown> & {
   paidBy?: { name?: string };
 };
 
 export default function ExpensesPage() {
+  const routeColor = useRouteColor();
   const queryClient = useQueryClient();
   const role = useAuthStore((s) => s.user?.role);
   const { authReady } = useAuthReady();
@@ -37,6 +39,7 @@ export default function ExpensesPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: 30_000,
   });
 
   const approveMutation = useOptimisticMutation({
@@ -63,24 +66,19 @@ export default function ExpensesPage() {
   const rows = Array.isArray(data) ? data : [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Expenses"
-        description="Company expenses and reimbursements."
-        action={
-          <button
-            type="button"
-            onClick={() => setShowNew(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            + New Expense
-          </button>
-        }
-      />
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+          + New Expense
+        </button>
+      }
+    >
       {actionError ? (
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600">{actionError}</p>
       ) : null}
-      <GlassCard>
+      <SectionCard noPadding accent={routeColor} className="p-4">
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
@@ -149,10 +147,10 @@ export default function ExpensesPage() {
             ]}
           />
         )}
-      </GlassCard>
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="New expense" size="lg">
+      </SectionCard>
+      <Modal open={showNew} onOpenChange={setShowNew} title="New expense" size="lg">
         <ExpenseForm onCancel={() => setShowNew(false)} onSuccess={() => setShowNew(false)} />
       </Modal>
-    </div>
+    </CrmPageShell>
   );
 }

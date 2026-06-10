@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { CustomerDetailSkeleton } from "@/components/ui/skeleton";
 import { SelectInput } from "@/components/ui/form-field";
 import { QUOTATION_STATUSES } from "@/lib/types";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 type QuotationDetail = Record<string, unknown> & {
   lineItems?: Array<{ name: string; qty: number; rate: number; amount: number }>;
@@ -135,7 +136,7 @@ export default function QuotationDetailPage() {
             ) : null}
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Valid until</dt>
-              <dd>{data.validUntil ? new Date(String(data.validUntil)).toLocaleDateString() : "—"}</dd>
+              <dd>{data.validUntil ? formatDate(data.validUntil) : "—"}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Created by</dt>
@@ -162,7 +163,7 @@ export default function QuotationDetailPage() {
             {data.approvedAt ? (
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Approved</dt>
-                <dd>{new Date(String(data.approvedAt)).toLocaleString()}</dd>
+                <dd>{formatDateTime(data.approvedAt)}</dd>
               </div>
             ) : null}
           </dl>

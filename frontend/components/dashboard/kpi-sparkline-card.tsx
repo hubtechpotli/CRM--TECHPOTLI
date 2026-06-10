@@ -1,22 +1,12 @@
 "use client";
 
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
+import Link from "next/link";
+import { memo } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { MiniSparkline } from "@/components/dashboard/mini-sparkline";
 
-export function KpiSparklineCard({
-  label,
-  value,
-  trendPct,
-  trendLabel,
-  icon: Icon,
-  iconBg = "bg-primary/10",
-  iconColor = "text-primary",
-  sparkData,
-  sparkColor = "#6366f1",
-  loading,
-}: {
+type KpiSparklineCardProps = {
   label: string;
   value: string | number;
   trendPct?: number | null;
@@ -26,78 +16,91 @@ export function KpiSparklineCard({
   iconColor?: string;
   sparkData?: { v: number }[];
   sparkColor?: string;
+  accentBorder?: string;
   loading?: boolean;
-}) {
+  href?: string;
+};
+
+export const KpiSparklineCard = memo(function KpiSparklineCard({
+  label,
+  value,
+  trendPct,
+  trendLabel,
+  icon: Icon,
+  iconBg = "bg-muted",
+  iconColor = "text-muted-foreground",
+  sparkData,
+  sparkColor = "#71717a",
+  accentBorder,
+  loading,
+  href,
+}: KpiSparklineCardProps) {
   const positive = (trendPct ?? 0) >= 0;
-  const data = sparkData?.length ? sparkData : [{ v: 0 }, { v: 0 }];
 
   if (loading) {
     return (
-      <div className="animate-pulse rounded-2xl border border-border/60 bg-card p-5">
-        <div className="h-4 w-24 rounded bg-muted" />
-        <div className="mt-3 h-8 w-16 rounded bg-muted" />
-        <div className="mt-4 h-12 rounded bg-muted" />
+      <div className="flex animate-pulse items-center gap-3 rounded-xl border border-border/60 bg-card p-3">
+        <div className="h-8 w-8 shrink-0 rounded-lg bg-muted" />
+        <div className="flex-1 space-y-1.5">
+          <div className="h-2.5 w-16 rounded bg-muted" />
+          <div className="h-5 w-12 rounded bg-muted" />
+        </div>
       </div>
     );
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm"
-      style={{ boxShadow: "var(--card-shadow)" }}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
+  const content = (
+    <>
+      <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", iconBg)}>
+        <Icon className={cn("h-4 w-4", iconColor)} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <div className="flex items-baseline gap-1.5">
+          <p className="text-lg font-bold leading-tight tracking-tight text-foreground">{value}</p>
           {trendPct != null ? (
-            <div className="mt-1 flex items-center gap-1">
-              {positive ? (
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
-              ) : (
-                <TrendingDown className="h-3 w-3 text-rose-500" />
+            <span
+              className={cn(
+                "inline-flex items-center gap-0.5 text-[10px] font-semibold",
+                positive ? "text-emerald-600" : "text-rose-600",
               )}
-              <span
-                className={cn(
-                  "text-[11px] font-medium",
-                  positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
-                )}
-              >
-                {positive ? "+" : ""}
-                {trendPct.toFixed(1)}%
-              </span>
-              {trendLabel ? (
-                <span className="text-[11px] text-muted-foreground">{trendLabel}</span>
-              ) : null}
-            </div>
+            >
+              {positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+              {positive ? "+" : ""}
+              {trendPct.toFixed(0)}%
+            </span>
           ) : null}
         </div>
-        <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", iconBg)}>
-          <Icon className={cn("h-5 w-5", iconColor)} />
-        </div>
+        {trendLabel ? (
+          <p className="truncate text-[10px] text-muted-foreground">{trendLabel}</p>
+        ) : null}
       </div>
-      <div className="mt-3 h-12 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
-            <defs>
-              <linearGradient id={`spark-${label}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={sparkColor} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={sparkColor} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area
-              type="monotone"
-              dataKey="v"
-              stroke={sparkColor}
-              strokeWidth={2}
-              fill={`url(#spark-${label})`}
-              dot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div className="hidden h-7 w-12 shrink-0 opacity-70 sm:block">
+        <MiniSparkline data={sparkData} color={sparkColor} />
       </div>
-    </motion.div>
+    </>
   );
-}
+
+  const className = cn(
+    "group flex items-center gap-2.5 rounded-lg border bg-card p-3 shadow-sm transition",
+    accentBorder ?? "border-border hover:border-foreground/15",
+    href && !accentBorder && "hover:bg-muted/30",
+    href && accentBorder && "hover:bg-muted/20",
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={className} style={{ boxShadow: "var(--card-shadow)" }}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={className} style={{ boxShadow: "var(--card-shadow)" }}>
+      {content}
+    </div>
+  );
+});

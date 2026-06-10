@@ -7,7 +7,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { removeListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
-import { motion } from "framer-motion";
 import {
   AlertTriangle,
   Calendar,
@@ -57,6 +56,10 @@ import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { computeKanbanStats } from "@/lib/lead-ui";
+import { MetricCard } from "@/components/dashboard/metric-card";
+import { FEATURE } from "@/lib/feature-colors";
+import { getRouteColor, ROUTE_COLORS } from "@/lib/nav-colors";
+import { usePathname } from "next/navigation";
 
 type LeadRow = Record<string, unknown> & {
   assignedTo?: { name?: string };
@@ -76,6 +79,8 @@ const STATUS_TABS = [
 ];
 
 export default function LeadsPage() {
+  const pathname = usePathname();
+  const routeColor = getRouteColor(pathname);
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -125,12 +130,12 @@ export default function LeadsPage() {
 
   const { data: kanbanData } = useQuery({
     queryKey: ["leads-kanban"],
-    enabled: authReady && view === "kanban",
+    enabled: authReady,
     queryFn: async () => {
       const res = await api.get<Record<string, LeadRow[]>>("/leads/kanban");
       return res.data;
     },
-    staleTime: 30_000,
+    staleTime: 60_000,
   });
 
   const stats = useMemo(() => computeKanbanStats(kanbanData), [kanbanData]);
@@ -149,6 +154,7 @@ export default function LeadsPage() {
       });
       return res.data;
     },
+    staleTime: 60_000,
   });
 
   const rows = leadsData?.items ?? [];
@@ -160,17 +166,17 @@ export default function LeadsPage() {
       <button
         type="button"
         onClick={() => setShowNewLead(true)}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm"
       >
         <Plus className="h-3.5 w-3.5" />
         New Lead
       </button>
-      <div className="flex rounded-xl border border-border bg-muted/40 p-0.5">
+      <div className="flex rounded-lg border border-border bg-muted/40 p-0.5">
         <button
           type="button"
           onClick={() => setView("list")}
           className={cn(
-            "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium",
+            "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium",
             view === "list" ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
           )}
         >
@@ -180,7 +186,7 @@ export default function LeadsPage() {
           type="button"
           onClick={() => setView("kanban")}
           className={cn(
-            "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium",
+            "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium",
             view === "kanban" ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
           )}
         >
@@ -191,46 +197,21 @@ export default function LeadsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {deleteError ? (
         <p className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
       ) : null}
-      <PageToolbar
-        title={adminView ? "All Leads" : "My Leads"}
-        description={
-          adminView
-            ? "View and manage leads across all salespeople."
-            : "Add leads you call, update status, and track your pipeline."
-        }
-        actions={listActions}
-      />
+      <PageToolbar hideTitle title="" actions={listActions} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Active leads", value: stats.total, icon: Users, color: "text-indigo-600 bg-indigo-500/10" },
-          { label: "Due today", value: stats.dueToday, icon: Calendar, color: "text-cyan-600 bg-cyan-500/10" },
-          { label: "Overdue", value: stats.overdue, icon: AlertTriangle, color: "text-amber-600 bg-amber-500/10" },
-          { label: "Hot priority", value: stats.hot, icon: Flame, color: "text-rose-600 bg-rose-500/10" },
-        ].map((kpi) => (
-          <motion.div
-            key={kpi.label}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">{kpi.label}</p>
-              <div className={cn("rounded-lg p-1.5", kpi.color)}>
-                <kpi.icon className="h-4 w-4" />
-              </div>
-            </div>
-            <p className="mt-2 text-2xl font-bold">{kpi.value}</p>
-          </motion.div>
-        ))}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard label="Active leads" value={stats.total} icon={Users} color={FEATURE.leads} />
+        <MetricCard label="Due today" value={stats.dueToday} icon={Calendar} color={FEATURE.followups} />
+        <MetricCard label="Overdue" value={stats.overdue} icon={AlertTriangle} color={FEATURE.followups} />
+        <MetricCard label="Hot priority" value={stats.hot} icon={Flame} color={ROUTE_COLORS["/support"]} />
       </div>
 
       {view === "list" ? (
-        <SectionCard noPadding>
+        <SectionCard noPadding accent={routeColor}>
           <div className="space-y-4 border-b border-border/50 p-5">
             <StatusTabs
               tabs={STATUS_TABS}
@@ -239,6 +220,7 @@ export default function LeadsPage() {
                 setStatusFilter(v);
                 setPage(1);
               }}
+              accent={routeColor}
             />
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -398,7 +380,7 @@ export default function LeadsPage() {
         <LeadKanban showSalesPerson={adminView} />
       )}
 
-      <Modal open={showNewLead} onClose={() => setShowNewLead(false)} title="New lead" size="lg">
+      <Modal open={showNewLead} onOpenChange={setShowNewLead} title="New lead" description="Add a prospect to your pipeline" size="lg" accent="cyan">
         <LeadForm
           onCancel={() => setShowNewLead(false)}
           onSuccess={(data) => {

@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Settings,
   StickyNote,
+  User,
   UserCog,
   UserPlus,
   Users,
@@ -31,11 +32,6 @@ export type NavGroup = {
   label: string;
   items: NavItem[];
 };
-
-/** Pinned above profile in the sidebar footer (not in the main scroll area). */
-export const BOTTOM_NAV_ITEMS: NavItem[] = [
-  { href: "/notepad", label: "Notepad", icon: StickyNote },
-];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -73,6 +69,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Other",
     items: [
+      { href: "/notepad", label: "Notepad", icon: StickyNote },
+      { href: "/profile", label: "Profile", icon: User },
       { href: "/emails", label: "Email Center", icon: Mail },
       { href: "/reports", label: "Reports", icon: BarChart3 },
       { href: "/settings", label: "Settings", icon: Settings },
@@ -92,7 +90,15 @@ export function roleLabel(role?: string) {
 
 export const PAGE_CTAS: Record<string, { label: string; href: string }> = {
   "/dashboard": { label: "New Lead", href: "/leads?new=1" },
+  "/team-updates": { label: "Post Update", href: "/team-updates" },
   "/leads": { label: "New Lead", href: "/leads?new=1" },
   "/customers": { label: "New Customer", href: "/customers?new=1" },
+  "/quotations": { label: "New Quote", href: "/quotations?new=1" },
+  "/invoices": { label: "New Invoice", href: "/invoices?new=1" },
+  "/payments": { label: "Record Payment", href: "/payments?new=1" },
   "/projects": { label: "New Project", href: "/projects?new=1" },
+  "/renewals": { label: "Add Renewal", href: "/renewals?new=1" },
+  "/support": { label: "New Ticket", href: "/support?new=1" },
+  "/employees": { label: "Add Employee", href: "/employees?new=1" },
+  "/expenses": { label: "Add Expense", href: "/expenses?new=1" },
 };

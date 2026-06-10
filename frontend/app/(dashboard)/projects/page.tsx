@@ -28,6 +28,7 @@ const ProjectKanban = dynamic(() => import("@/components/projects/project-kanban
 });
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
+import { useRouteColor } from "@/hooks/use-route-color";
 import { isTempId } from "@/lib/optimistic-mutation";
 
 type ProjectRow = Record<string, unknown> & {
@@ -44,6 +45,7 @@ const STATUS_TABS = [
 ];
 
 export default function ProjectsPage() {
+  const routeColor = useRouteColor();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<"list" | "kanban">("list");
@@ -81,8 +83,8 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       <PageToolbar
-        title="Projects"
-        description="Active and completed client projects."
+        hideTitle
+        title=""
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -120,9 +122,9 @@ export default function ProjectsPage() {
       />
 
       {view === "kanban" ? <ProjectKanban /> : (
-        <SectionCard noPadding>
+        <SectionCard noPadding accent={routeColor}>
           <div className="border-b border-border/50 p-5">
-            <StatusTabs tabs={STATUS_TABS} value={statusFilter} onChange={setStatusFilter} />
+            <StatusTabs tabs={STATUS_TABS} value={statusFilter} onChange={setStatusFilter} accent={routeColor} />
           </div>
           {error ? (
             <div className="py-10 text-center">

@@ -233,7 +233,7 @@ export function EmployeeForm({
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-indigo-600 disabled:opacity-60"
+          className="crm-btn-primary disabled:opacity-60"
         >
           {mutation.isPending ? "Saving…" : isEdit ? "Update employee" : "Create employee"}
         </button>

@@ -119,9 +119,9 @@ export function NotificationBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-xl border border-border/80 bg-background/95 shadow-2xl shadow-indigo-500/10 backdrop-blur-xl"
+              className="absolute right-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-lg border border-border bg-card shadow-xl"
             >
-              <div className="flex items-center justify-between border-b border-border/60 bg-gradient-to-r from-primary/5 to-accent/5 px-4 py-3">
+              <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold">Notifications</p>
                   {unreadInList > 0 ? (

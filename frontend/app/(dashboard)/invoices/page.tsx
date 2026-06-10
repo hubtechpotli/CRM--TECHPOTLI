@@ -8,19 +8,24 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
-import { GlassCard } from "@/components/ui/glass-card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
+import { SectionCard } from "@/components/dashboard/section-card";
+import { Plus } from "lucide-react";
 import { DataTable } from "@/components/dashboard/data-table";
 import { Modal } from "@/components/ui/modal";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { isTempId } from "@/lib/optimistic-mutation";
+import { usePathname } from "next/navigation";
+import { getRouteColor } from "@/lib/nav-colors";
 
 type InvoiceRow = Record<string, unknown> & {
   customer?: { companyName?: string };
 };
 
 export default function InvoicesPage() {
+  const pathname = usePathname();
+  const routeColor = getRouteColor(pathname);
   const router = useRouter();
   const [showNew, setShowNew] = useState(false);
   const [page, setPage] = useState(1);
@@ -32,26 +37,23 @@ export default function InvoicesPage() {
       const res = await api.get("/invoices", { params: { page, limit: pageSize } });
       return normalizePaginated<InvoiceRow>(res.data);
     },
+    staleTime: 30_000,
   });
 
   const rows = data?.data ?? [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Invoices"
-        description="Billing invoices and payment status."
-        action={
-          <button
-            type="button"
-            onClick={() => setShowNew(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            + New Invoice
-          </button>
-        }
-      />
-      <GlassCard>
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+          <Plus className="h-3.5 w-3.5" />
+          New Invoice
+        </button>
+      }
+    >
+      <SectionCard noPadding accent={routeColor} className="p-4">
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
         ) : error ? (
@@ -117,8 +119,8 @@ export default function InvoicesPage() {
             className="px-4 pb-4"
           />
         ) : null}
-      </GlassCard>
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="New invoice" size="xl">
+      </SectionCard>
+      <Modal open={showNew} onOpenChange={setShowNew} title="New invoice" description="Bill a customer for services" size="lg" accent="indigo">
         <InvoiceForm
           onCancel={() => setShowNew(false)}
           onSuccess={(data) => {
@@ -128,6 +130,6 @@ export default function InvoicesPage() {
           }}
         />
       </Modal>
-    </div>
+    </CrmPageShell>
   );
 }

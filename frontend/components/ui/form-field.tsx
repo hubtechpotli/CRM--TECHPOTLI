@@ -1,23 +1,28 @@
 import { cn } from "@/lib/utils";
 
-const inputClass =
-  "w-full rounded-lg border border-border bg-white/50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:bg-slate-900/50";
+export const inputClass =
+  "crm-input w-full border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:ring-2 focus:ring-foreground/5 dark:border-zinc-700 dark:bg-zinc-900/50";
 
 export function FormField({
   label,
   error,
   children,
   className,
+  hint,
 }: {
   label: string;
   error?: string;
   children: React.ReactNode;
   className?: string;
+  hint?: string;
 }) {
   return (
-    <div className={cn("space-y-1", className)}>
-      <label className="block text-sm font-medium">{label}</label>
+    <div className={cn("space-y-1.5", className)}>
+      <label className="block text-xs font-medium text-foreground">
+        {label}
+      </label>
       {children}
+      {hint && !error ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
       {error ? <p className="text-xs text-red-500">{error}</p> : null}
     </div>
   );
@@ -49,7 +54,7 @@ export function TextInput({
       placeholder={placeholder}
       required={required}
       disabled={disabled}
-      className={inputClass}
+      className={cn(inputClass, disabled && "cursor-not-allowed opacity-60")}
     />
   );
 }
@@ -103,7 +108,7 @@ export function SelectInput({
       onChange={(e) => onChange(e.target.value)}
       required={required}
       disabled={disabled}
-      className={inputClass}
+      className={cn(inputClass, "cursor-pointer")}
     >
       {placeholder ? (
         <option value="" disabled>

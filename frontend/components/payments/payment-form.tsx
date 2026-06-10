@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useFormDraft } from "@/hooks/use-form-draft";
 import { api } from "@/lib/api";
@@ -10,7 +10,10 @@ import { formatLabel } from "@/lib/format";
 import { appendToMatchingLists, createTempId } from "@/lib/optimistic-mutation";
 import { uploadFileWithProgress } from "@/lib/upload-file";
 import { PAYMENT_METHODS, PAYMENT_STATUSES } from "@/lib/types";
+import { CustomerPickerField } from "@/components/ui/customer-picker-field";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { FormFooterActions, FormShell } from "@/components/ui/form-shell";
+import { FormSection } from "@/components/ui/form-section";
 import { SaveProgress, UploadProgress } from "@/components/ui/upload-progress";
 import { CheckCircle2, Upload, X } from "lucide-react";
 
@@ -81,16 +84,6 @@ export function PaymentForm({
       }
     };
   }, []);
-
-  const { data: customers = [] } = useQuery({
-    queryKey: ["customers-directory", { q: undefined }],
-    queryFn: async () => {
-      const data = await import("@/lib/customers-directory").then((m) =>
-        m.fetchCustomersDirectory({ limit: 500 }),
-      );
-      return data.items;
-    },
-  });
 
   async function handleProofFile(file: File) {
     setError(null);
@@ -182,7 +175,6 @@ export function PaymentForm({
     invalidateKeys: [["payments"], ["payments-summary"]],
     onMutate: () => {
       const tempId = createTempId();
-      const customer = customers.find((c) => String(c.id) === form.customerId);
       appendToMatchingLists(queryClient, ["payments"], {
         id: tempId,
         customerId: form.customerId,
@@ -190,7 +182,6 @@ export function PaymentForm({
         status: form.status,
         paymentMethod: form.paymentMethod,
         collectedAt: form.collectedAt,
-        customer: customer ? { companyName: customer.companyName } : undefined,
         proofFilename: form.proofFilename || undefined,
       });
       return { tempId };
@@ -240,32 +231,29 @@ export function PaymentForm({
   const isBusy = mutation.isPending || uploading;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit}>
+      <FormShell footer={<FormFooterActions onCancel={onCancel} submitLabel="Record collection" pending={isBusy} pendingLabel="Saving…" />}>
       {restored ? (
-        <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
           <span className="text-muted-foreground">Draft restored from this browser</span>
-          <button type="button" onClick={discardDraft} className="text-primary hover:underline">
+          <button type="button" onClick={discardDraft} className="font-medium text-foreground hover:underline">
             Discard draft
           </button>
         </div>
       ) : null}
       {error ? (
-        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : null}
 
-      <FormField label="Company / Customer">
-        <SelectInput
+      <FormSection title="Customer" description="Who made this payment?" accent="emerald">
+        <CustomerPickerField
           value={form.customerId}
           onChange={(v) => set("customerId", v)}
-          placeholder="Select company"
+          label="Company / Customer"
           required
           disabled={!!defaultValues?.customerId}
-          options={customers.map((c) => ({
-            value: String(c.id),
-            label: String(c.companyName ?? c.id),
-          }))}
         />
-      </FormField>
+      </FormSection>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Amount received (₹)">
@@ -385,25 +373,7 @@ export function PaymentForm({
         <SaveProgress stage={saveStage === "done" ? "done" : "saving"} />
       ) : null}
 
-      <div className="flex justify-end gap-2 pt-2">
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isBusy}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60"
-          >
-            Cancel
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          disabled={isBusy}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-indigo-600 disabled:opacity-60"
-        >
-          {mutation.isPending ? "Saving…" : uploading ? "Uploading proof…" : "Record collection"}
-        </button>
-      </div>
+      </FormShell>
     </form>
   );
 }

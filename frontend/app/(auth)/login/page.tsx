@@ -24,7 +24,7 @@ type LoginResponse = {
 };
 
 const inputClass =
-  "w-full rounded-xl border border-border/80 bg-white/60 py-2.5 pl-10 pr-3 text-sm outline-none transition-all placeholder:text-muted-foreground/60 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 dark:bg-slate-900/40 dark:focus:bg-slate-900/70";
+  "w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/60 focus:border-foreground/25 focus:ring-2 focus:ring-foreground/5";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -209,9 +209,9 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:from-indigo-500 hover:to-indigo-600 hover:shadow-indigo-500/40 disabled:opacity-60 disabled:hover:shadow-indigo-500/25"
+            className="crm-btn-primary group w-full justify-center !py-2.5 !text-sm disabled:opacity-60"
           >
-            <span className="relative z-10 flex items-center justify-center gap-2">
+            <span className="flex items-center justify-center gap-2">
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -224,7 +224,6 @@ export default function LoginPage() {
                 </>
               )}
             </span>
-            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
           </button>
         </motion.div>
       </form>

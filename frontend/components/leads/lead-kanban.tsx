@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { moveKanbanCard } from "@/lib/optimistic-mutation";
+import { formatDate } from "@/lib/format";
 import {
   DndContext,
   DragEndEvent,
@@ -107,7 +108,7 @@ function LeadCard({
           )}
         >
           <Calendar className="h-3 w-3 shrink-0" />
-          {new Date(String(lead.followUpDate)).toLocaleDateString()}
+          {formatDate(lead.followUpDate)}
           {overdue ? " · Overdue" : ""}
         </div>
       ) : null}
@@ -201,6 +202,7 @@ export function LeadKanban({ showSalesPerson = false }: { showSalesPerson?: bool
       const res = await api.get<Record<string, Lead[]>>("/leads/kanban");
       return res.data;
     },
+    staleTime: 60_000,
   });
 
   const statusMutation = useOptimisticMutation({

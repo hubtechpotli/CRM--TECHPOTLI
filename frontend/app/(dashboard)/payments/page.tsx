@@ -314,7 +314,7 @@ export default function PaymentsPage() {
         )}
       </GlassCard>
 
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="Record collection" size="lg">
+      <Modal open={showNew} onOpenChange={setShowNew} title="Record collection" description="Log a payment from your customer" size="lg" accent="emerald">
         <PaymentForm
           onCancel={() => setShowNew(false)}
           onSuccess={() => {
