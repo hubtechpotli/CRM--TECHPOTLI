@@ -117,6 +117,7 @@ export function EmployeeForm({
           department: payload.department.trim() || undefined,
           designation: payload.designation.trim() || undefined,
           isActive: payload.isActive === "true",
+          allowRemoteAccess: payload.allowRemoteAccess === "true",
         };
         patchMatchingListItems(queryClient, ["employees"], employeeId, patch);
         return {};
@@ -179,7 +180,7 @@ export function EmployeeForm({
           <FormField label="Password" className="sm:col-span-2">
             <PasswordInput value={form.password} onChange={(v) => set("password", v)} required />
             <p className="mt-1 text-xs text-muted-foreground">
-              Min 8 chars with uppercase, number, and special character
+              Min 8 chars with uppercase, number, and special character. On first login they must set up two-factor authentication (authenticator app).
             </p>
           </FormField>
         ) : null}
@@ -213,11 +214,11 @@ export function EmployeeForm({
                 onChange={(v) => set("allowRemoteAccess", v)}
                 options={[
                   { value: "false", label: "Office network only" },
-                  { value: "true", label: "Allow remote login (requires 2FA)" },
+                  { value: "true", label: "Allow remote login (work from home)" },
                 ]}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Remote access is only allowed when the employee has 2FA enabled.
+                Lets this employee sign in from outside the office network. Two-factor authentication is required for all employees on first login.
               </p>
             </FormField>
           </>

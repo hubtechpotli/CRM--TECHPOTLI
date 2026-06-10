@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isJwtExpired } from "@/lib/jwt";
 
 const SESSION_TOKEN_KEY = "techpotli-access-token";
-const SESSION_EXPIRES_KEY = "techpotli-access-expires";
 
 export type AuthUser = {
   id: string;
@@ -33,25 +33,24 @@ type AuthState = {
   logout: () => void;
 };
 
-function writeSessionToken(accessToken: string, expiresInMs = 14 * 60_000) {
+function writeSessionToken(accessToken: string) {
   if (typeof window === "undefined") return;
-  const expiresAt = Date.now() + expiresInMs;
-  sessionStorage.setItem(SESSION_TOKEN_KEY, accessToken);
-  sessionStorage.setItem(SESSION_EXPIRES_KEY, String(expiresAt));
+  try {
+    localStorage.setItem(SESSION_TOKEN_KEY, accessToken);
+  } catch {
+    /* quota exceeded */
+  }
 }
 
 function clearSessionToken() {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem(SESSION_TOKEN_KEY);
-  sessionStorage.removeItem(SESSION_EXPIRES_KEY);
+  localStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
 function readSessionToken(): string | null {
   if (typeof window === "undefined") return null;
-  const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
-  const expiresRaw = sessionStorage.getItem(SESSION_EXPIRES_KEY);
-  if (!token || !expiresRaw) return null;
-  if (Date.now() >= Number(expiresRaw)) {
+  const token = localStorage.getItem(SESSION_TOKEN_KEY);
+  if (!token || isJwtExpired(token)) {
     clearSessionToken();
     return null;
   }
@@ -68,8 +67,8 @@ export const useAuthStore = create<AuthState>()(
       setupToken: null,
       pending2FA: false,
       pending2FASetup: false,
-      setAuth: (user, accessToken, sessionId = null, expiresInMs) => {
-        writeSessionToken(accessToken, expiresInMs);
+      setAuth: (user, accessToken, sessionId = null) => {
+        writeSessionToken(accessToken);
         set({
           user,
           accessToken,
@@ -84,13 +83,13 @@ export const useAuthStore = create<AuthState>()(
         set({ pending2FA, tempToken }),
       setPending2FASetup: (pending2FASetup, setupToken = null) =>
         set({ pending2FASetup, setupToken }),
-      setAccessToken: (accessToken, sessionId = null, expiresInMs) => {
-        writeSessionToken(accessToken, expiresInMs);
-        set({ accessToken, sessionId });
+      setAccessToken: (accessToken, sessionId = null) => {
+        writeSessionToken(accessToken);
+        set({ accessToken, sessionId: sessionId ?? get().sessionId });
       },
       restoreSessionToken: () => {
         const existing = get().accessToken;
-        if (existing) return existing;
+        if (existing && !isJwtExpired(existing)) return existing;
         const token = readSessionToken();
         if (token) set({ accessToken: token });
         return token;
@@ -112,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
       name: "techpotli-auth",
       partialize: (state) => ({
         user: state.user,
+        sessionId: state.sessionId,
         pending2FA: state.pending2FA,
         pending2FASetup: state.pending2FASetup,
         tempToken: state.tempToken,

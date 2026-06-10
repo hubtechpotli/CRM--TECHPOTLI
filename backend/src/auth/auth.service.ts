@@ -10,11 +10,13 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { SessionService } from '../redis/session.service';
 import { EncryptionService } from '../common/encryption.service';
 import { IpAccessService } from '../common/services/ip-access.service';
+import { assertSessionClientMatches } from '../common/utils/session-client.util';
 import { parseUserAgent } from '../common/utils/ip.util';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -74,13 +76,37 @@ export class AuthService {
     private ipAccess: IpAccessService,
   ) {}
 
+  /** Every employee and admin must complete 2FA enrollment before accessing the CRM. */
+  private mustEnroll2FA(role: string): boolean {
+    return (
+      role === UserRole.EMPLOYEE ||
+      role === UserRole.ADMIN ||
+      role === UserRole.SUPER_ADMIN
+    );
+  }
+
   async login(email: string, password: string, ip: string, userAgent: string): Promise<AuthResult> {
     const lockKey = `login:lock:${email.toLowerCase()}`;
     if (await this.redis.get(lockKey)) {
       throw new UnauthorizedException('Account locked. Try again in 15 minutes.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        passwordHash: true,
+        isActive: true,
+        twoFactorSecret: true,
+        twoFactorEnabled: true,
+        allowRemoteAccess: true,
+        mustChangePassword: true,
+        allowedIPs: true,
+      },
+    });
     const fail = async () => {
       const attemptsKey = `login:attempts:${email.toLowerCase()}`;
       const raw = await this.redis.get(attemptsKey);
@@ -102,18 +128,21 @@ export class AuthService {
 
     const settings = await this.prisma.systemSettings.findUnique({ where: { id: 'default' } });
     const force2FA = settings?.force2FA ?? false;
+    const needsEnrollment =
+      !user!.twoFactorEnabled &&
+      (this.mustEnroll2FA(user!.role) || force2FA);
 
-    if (force2FA && !user!.twoFactorEnabled) {
+    if (needsEnrollment || (user!.twoFactorEnabled && !user!.twoFactorSecret)) {
       return {
         requires2FASetup: true,
-        setupToken: this.createFlowToken(user!.id, '2fa-enroll', '15m'),
+        setupToken: this.createFlowToken(user!.id, '2fa-enroll', '30m'),
       };
     }
 
     if (user!.twoFactorEnabled && user!.twoFactorSecret) {
       return {
         requires2FA: true,
-        tempToken: this.createFlowToken(user!.id, '2fa-verify', '5m'),
+        tempToken: this.createFlowToken(user!.id, '2fa-verify', '10m'),
       };
     }
 
@@ -183,10 +212,25 @@ export class AuthService {
 
   async confirm2faEnroll(setupToken: string, code: string, ip: string, userAgent: string): Promise<AuthResult> {
     const userId = this.verifyFlowToken(setupToken, '2fa-enroll');
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        twoFactorSecret: true,
+        allowRemoteAccess: true,
+        allowedIPs: true,
+        mustChangePassword: true,
+      },
+    });
     if (!user?.isActive || !user.twoFactorSecret) {
       throw new BadRequestException('Setup expired. Start again.');
     }
+
+    await this.ipAccess.assertLoginAllowed(user, ip);
 
     const secret = this.encryption.decrypt(user.twoFactorSecret);
     const ok = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });
@@ -261,6 +305,12 @@ export class AuthService {
         if (graceSession && graceSession.user.isActive && graceSession.expiresAt > new Date()) {
           const match = await bcrypt.compare(grace.refreshToken, graceSession.refreshTokenHash);
           if (match) {
+            try {
+              assertSessionClientMatches(graceSession, ip, userAgent);
+            } catch (err) {
+              await this.revokeSessionRecord(graceSession.id, graceSession.userId, lookup);
+              throw err;
+            }
             return this.tokensFromSession(graceSession.user, graceSession.id, grace.refreshToken);
           }
         }
@@ -281,6 +331,13 @@ export class AuthService {
     const match = await bcrypt.compare(refreshToken, session.refreshTokenHash);
     if (!match || !session.user.isActive) {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    try {
+      assertSessionClientMatches(session, ip, userAgent);
+    } catch (err) {
+      await this.revokeSessionRecord(session.id, session.userId, lookup);
+      throw err;
     }
 
     await this.redis.set(`refresh:revoked:${lookup}`, session.userId, REFRESH_TTL);
@@ -440,6 +497,14 @@ export class AuthService {
         mustChangePassword: user.mustChangePassword,
       },
     };
+  }
+
+  private async revokeSessionRecord(sessionId: string, userId: string, lookup?: string) {
+    if (lookup) {
+      await this.redis.set(`refresh:revoked:${lookup}`, userId, REFRESH_TTL);
+    }
+    await this.prisma.userSession.deleteMany({ where: { id: sessionId, userId } });
+    await this.sessions.revokeSession(sessionId, userId);
   }
 
   private async revokeAllSessionsForUser(userId: string) {

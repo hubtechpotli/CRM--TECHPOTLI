@@ -24,7 +24,7 @@ import { api } from "@/lib/api";
 import type { TeamUpdatesSummary } from "@/lib/team-updates";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { NAV_GROUPS, PAGE_CTAS, roleLabel } from "@/lib/shell-nav-groups";
+import { BOTTOM_NAV_ITEMS, NAV_GROUPS, PAGE_CTAS, roleLabel } from "@/lib/shell-nav-groups";
 
 function getPageCta(pathname: string) {
   if (PAGE_CTAS[pathname]) return PAGE_CTAS[pathname];
@@ -124,6 +124,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     items: group.items.filter((item) => canAccessNav(user?.role, item.href)),
   })).filter((g) => g.items.length > 0);
 
+  const bottomNavItems = BOTTOM_NAV_ITEMS.filter((item) =>
+    canAccessNav(user?.role, item.href),
+  );
+
   return (
     <div className="flex min-h-screen bg-background">
       <RouteProgress />
@@ -179,6 +183,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="shrink-0 border-t border-white/10 bg-sidebar p-3 shadow-[0_-4px_24px_rgba(0,0,0,0.25)]">
+          {bottomNavItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-md shadow-indigo-900/40"
+                    : "text-indigo-100/80 hover:bg-white/10 hover:text-white",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
           <Link
             href="/profile"
             className={cn(

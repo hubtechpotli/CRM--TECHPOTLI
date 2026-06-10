@@ -32,12 +32,16 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+/** Pinned above profile in the sidebar footer (not in the main scroll area). */
+export const BOTTOM_NAV_ITEMS: NavItem[] = [
+  { href: "/notepad", label: "Notepad", icon: StickyNote },
+];
+
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Main",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/notepad", label: "Notepad", icon: StickyNote },
       { href: "/team-updates", label: "Team Updates", icon: MessageSquare },
     ],
   },

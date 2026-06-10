@@ -29,6 +29,7 @@ export default function LoginPage() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const setPending2FA = useAuthStore((s) => s.setPending2FA);
   const setPending2FASetup = useAuthStore((s) => s.setPending2FASetup);
+  const logout = useAuthStore((s) => s.logout);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,12 +44,14 @@ export default function LoginPage() {
       const { data } = await api.post<LoginResponse>("/auth/login", { email, password });
 
       if (data.requires2FASetup && data.setupToken) {
+        logout();
         setPending2FASetup(true, data.setupToken);
         router.push("/security/setup-2fa");
         return;
       }
 
       if (data.requires2FA && data.tempToken) {
+        logout();
         setPending2FA(true, data.tempToken);
         router.push("/2fa-verify");
         return;

@@ -5,7 +5,6 @@ import { ipMatchesCidr, normalizeClientIp, parseEnvOfficeCidrs } from '../utils/
 type LoginUser = {
   id: string;
   allowRemoteAccess: boolean;
-  twoFactorEnabled: boolean;
   allowedIPs: string[];
 };
 
@@ -14,7 +13,7 @@ export class IpAccessService {
   constructor(private prisma: PrismaService) {}
 
   async assertLoginAllowed(user: LoginUser, ip: string) {
-    if (user.allowRemoteAccess && user.twoFactorEnabled) return;
+    if (user.allowRemoteAccess) return;
 
     const office = await this.prisma.allowedOfficeIp.findMany({
       where: { isActive: true },
@@ -31,7 +30,7 @@ export class IpAccessService {
     const ok = cidrs.some((c) => ipMatchesCidr(normalizedIp, c));
     if (!ok) {
       throw new ForbiddenException(
-        `Login is only allowed from the office network. Contact your admin for remote access. (Your IP: ${normalizedIp})`,
+        `Login is only allowed from the office network. Ask your admin to enable "Work from home" on your employee profile, or add your IP (${normalizedIp}) under Settings → Allowed IPs.`,
       );
     }
   }

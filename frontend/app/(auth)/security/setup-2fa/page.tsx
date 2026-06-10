@@ -21,7 +21,10 @@ export default function Setup2faPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!setupToken) return;
+    if (!setupToken) {
+      router.replace("/login");
+      return;
+    }
     api
       .post<{ qrCode: string }>("/auth/2fa/setup-enroll", { setupToken })
       .then((res) => setQrCode(res.data.qrCode))
@@ -31,7 +34,7 @@ export default function Setup2faPage() {
           : "Setup session expired. Please sign in again.";
         setError(Array.isArray(message) ? message.join(", ") : String(message));
       });
-  }, [setupToken]);
+  }, [setupToken, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -112,8 +115,11 @@ export default function Setup2faPage() {
         <TechPotliLogo size="sm" className="mx-auto" />
         <h1 className="mt-4 text-xl font-bold">Set up two-factor authentication</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Scan the QR code with Google Authenticator or Authy, then enter the 6-digit code.
+          Required on first login. Scan the QR code with Google Authenticator or Authy, then enter the 6-digit code.
         </p>
+      {!qrCode && !error ? (
+        <p className="mb-4 text-center text-sm text-muted-foreground">Preparing your QR code…</p>
+      ) : null}
       </div>
       {qrCode ? (
         <div className="mb-4 flex justify-center">

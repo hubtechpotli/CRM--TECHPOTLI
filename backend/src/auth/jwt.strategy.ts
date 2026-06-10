@@ -2,8 +2,10 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionService } from '../redis/session.service';
+import { assertSessionClientMatches } from '../common/utils/session-client.util';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -16,10 +18,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: config.get<string>('JWT_ACCESS_SECRET'),
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: { sub: string; email: string; role: string; sid?: string }) {
+  async validate(
+    req: Request,
+    payload: { sub: string; email: string; role: string; sid?: string },
+  ) {
     if (!payload.sid) throw new UnauthorizedException('Session expired');
 
     const user = await this.prisma.user.findUnique({
@@ -36,11 +42,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
     if (!user?.isActive) throw new UnauthorizedException('Session expired');
+    if (!user.twoFactorEnabled) {
+      throw new UnauthorizedException('Two-factor authentication required. Please sign in again.');
+    }
 
     const session = await this.prisma.userSession.findFirst({
       where: { id: payload.sid, userId: payload.sub, expiresAt: { gt: new Date() } },
     });
     if (!session) throw new UnauthorizedException('Session expired');
+
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.ip ||
+      '127.0.0.1';
+    const userAgent = (req.headers['user-agent'] as string) || 'unknown';
+    assertSessionClientMatches(session, ip, userAgent);
 
     const valid = await this.sessions.isSessionValid(payload.sid, payload.sub);
     if (!valid) throw new UnauthorizedException('Session expired');

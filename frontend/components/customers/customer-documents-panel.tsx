@@ -6,14 +6,14 @@ import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { appendListItem, createTempId } from "@/lib/optimistic-mutation";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel } from "@/lib/format";
+import { uploadFileWithProgress } from "@/lib/upload-file";
 import { DOCUMENT_TYPES } from "@/lib/types";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Modal } from "@/components/ui/modal";
 import { FormField, SelectInput, TextInput } from "@/components/ui/form-field";
+import { SaveProgress, UploadProgress } from "@/components/ui/upload-progress";
 
 type Document = Record<string, unknown>;
-
-type UploadResult = { key: string; url: string; filename: string; size: number };
 
 const emptyForm = {
   documentType: "PAN_CARD",
@@ -26,6 +26,8 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
   const [showUpload, setShowUpload] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [saveStage, setSaveStage] = useState<"idle" | "uploading" | "saving" | "done">("idle");
 
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ["customer-documents", customerId],
@@ -48,19 +50,31 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
 
   const docsKey = ["customer-documents", customerId] as const;
 
+  function resetModal() {
+    setShowUpload(false);
+    setForm(emptyForm);
+    setSelectedFile(null);
+    setUploadPercent(null);
+    setSaveStage("idle");
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
   const uploadMutation = useOptimisticMutation({
     mutationFn: async () => {
       if (!selectedFile) throw new Error("No file selected");
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      const uploadRes = await api.post<UploadResult>("/uploads", formData);
-      const { key, filename, size } = uploadRes.data;
+
+      setSaveStage("uploading");
+      setUploadPercent(0);
+
+      const uploaded = await uploadFileWithProgress(selectedFile, setUploadPercent);
+
+      setSaveStage("saving");
       const res = await api.post(`/customers/${customerId}/documents`, {
         documentType: form.documentType,
-        filename,
-        s3Key: key,
-        mimeType: selectedFile.type || "application/octet-stream",
-        fileSizeBytes: size,
+        filename: uploaded.filename,
+        s3Key: uploaded.key,
+        mimeType: uploaded.mimeType ?? selectedFile.type ?? "application/octet-stream",
+        fileSizeBytes: uploaded.size ?? selectedFile.size,
         customName: form.customName.trim() || undefined,
       });
       return res.data;
@@ -68,18 +82,27 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
     snapshotKeys: [docsKey],
     invalidateKeys: [docsKey, ["customer-timeline", customerId]],
     onMutate: () => {
+      const tempId = createTempId();
       appendListItem(queryClient, docsKey, {
-        id: createTempId(),
+        id: tempId,
         documentType: form.documentType,
         filename: selectedFile?.name ?? "Uploading…",
         customName: form.customName.trim() || undefined,
+        status: "PENDING",
       });
-      setShowUpload(false);
-      setForm(emptyForm);
-      setSelectedFile(null);
-      if (fileRef.current) fileRef.current.value = "";
+      return { tempId };
+    },
+    onSuccess: () => {
+      setSaveStage("done");
+      setTimeout(resetModal, 800);
+    },
+    onError: () => {
+      setSaveStage("idle");
+      setUploadPercent(null);
     },
   });
+
+  const isBusy = uploadMutation.isPending || uploadPercent !== null;
 
   return (
     <div className="space-y-4">
@@ -151,7 +174,7 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
         </GlassCard>
       )}
 
-      <Modal open={showUpload} onClose={() => setShowUpload(false)} title="Upload document">
+      <Modal open={showUpload} onClose={resetModal} title="Upload document">
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
@@ -180,20 +203,37 @@ export function CustomerDocumentsPanel({ customerId }: { customerId: string }) {
               ref={fileRef}
               type="file"
               required
+              disabled={isBusy}
               onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-              className="w-full text-sm"
+              className="w-full text-sm disabled:opacity-60"
             />
+            {selectedFile ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {selectedFile.name} ({Math.max(1, Math.round(selectedFile.size / 1024))} KB)
+              </p>
+            ) : null}
           </FormField>
+
+          {saveStage === "uploading" && uploadPercent !== null ? (
+            <UploadProgress percent={uploadPercent} label="Uploading file to storage…" />
+          ) : null}
+          {saveStage === "saving" ? <SaveProgress stage="saving" /> : null}
+          {saveStage === "done" ? <SaveProgress stage="done" /> : null}
+
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setShowUpload(false)} className="rounded-lg border border-border px-4 py-2 text-sm">
+            <button type="button" onClick={resetModal} disabled={isBusy} className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-60">
               Cancel
             </button>
             <button
               type="submit"
-              disabled={uploadMutation.isPending || !selectedFile}
+              disabled={isBusy || !selectedFile}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
-              {uploadMutation.isPending ? "Uploading…" : "Upload"}
+              {saveStage === "uploading"
+                ? `Uploading ${uploadPercent ?? 0}%`
+                : saveStage === "saving"
+                  ? "Saving…"
+                  : "Upload"}
             </button>
           </div>
         </form>
