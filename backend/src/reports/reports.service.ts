@@ -108,8 +108,18 @@ export class ReportsService {
     return ((current - previous) / previous) * 100;
   }
 
+  private paymentRevenueWhere(userRole: string, userId: string): Prisma.PaymentWhereInput {
+    const base: Prisma.PaymentWhereInput = { status: 'PAID' };
+    if (isLeadAdmin(userRole)) return base;
+    return {
+      ...base,
+      OR: [{ createdById: userId }, { customer: { assignedEmployeeId: userId } }],
+    };
+  }
+
   async crmInsights(userRole: string, userId: string) {
-    const cacheKey = `reports:crm-insights:${userRole}:${userId}`;
+    const ns = await this.cache.namespaceVersion('crm-insights');
+    const cacheKey = `reports:crm-insights:${ns}:${userRole}:${userId}`;
     return this.cache.wrap(cacheKey, 60, async () => {
       const leadWhere = buildLeadWhere(userRole, userId);
       const admin = isLeadAdmin(userRole);
@@ -125,11 +135,15 @@ export class ReportsService {
       const previousStart = new Date(currentStart);
       previousStart.setDate(previousStart.getDate() - 30);
 
+      const revenueWhere = this.paymentRevenueWhere(userRole, userId);
+
       const [
         totalLeads,
         convertedLeads,
         followUpsDueToday,
         revenueAgg,
+        revenueCurrent,
+        revenuePrevious,
         leadsCurrent,
         leadsPrevious,
         convertedCurrent,
@@ -151,12 +165,18 @@ export class ReportsService {
             status: { notIn: [LeadStatus.WON, LeadStatus.LOST] },
           },
         }),
-        admin
-          ? this.prismaRead.payment.aggregate({
-              _sum: { paidAmount: true },
-              where: { status: 'PAID' },
-            })
-          : Promise.resolve({ _sum: { paidAmount: null } }),
+        this.prismaRead.payment.aggregate({
+          _sum: { paidAmount: true },
+          where: revenueWhere,
+        }),
+        this.prismaRead.payment.aggregate({
+          _sum: { paidAmount: true },
+          where: { ...revenueWhere, collectedAt: { gte: currentStart } },
+        }),
+        this.prismaRead.payment.aggregate({
+          _sum: { paidAmount: true },
+          where: { ...revenueWhere, collectedAt: { gte: previousStart, lt: currentStart } },
+        }),
         this.prismaRead.lead.count({
           where: { ...leadWhere, createdAt: { gte: currentStart } },
         }),
@@ -215,6 +235,8 @@ export class ReportsService {
       ]);
 
       const revenue = Number(revenueAgg._sum.paidAmount ?? 0);
+      const revenueCurrentAmt = Number(revenueCurrent._sum.paidAmount ?? 0);
+      const revenuePreviousAmt = Number(revenuePrevious._sum.paidAmount ?? 0);
 
       const dayMap = new Map<string, number>();
       for (let i = 29; i >= 0; i--) {
@@ -264,7 +286,7 @@ export class ReportsService {
           trends: {
             totalLeadsPct: this.pctChange(leadsCurrent, leadsPrevious),
             convertedPct: this.pctChange(convertedCurrent, convertedPrevious),
-            revenuePct: 0,
+            revenuePct: this.pctChange(revenueCurrentAmt, revenuePreviousAmt),
             followUpsPct: this.pctChange(followUpsCurrent, followUpsPrevious),
           },
         },

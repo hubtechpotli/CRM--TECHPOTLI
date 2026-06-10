@@ -17,8 +17,6 @@ import {
 import { api } from "@/lib/api";
 import { formatDateTime, formatLabel } from "@/lib/format";
 import { useAssignees } from "@/hooks/use-users";
-import { useAuthStore } from "@/store/auth-store";
-import { isAdmin } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
@@ -96,8 +94,6 @@ export function CustomerWorkHub({
   onViewAll?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
-  const admin = isAdmin(user?.role);
   const { data: assignees = [] } = useAssignees();
 
   const [statusFilter, setStatusFilter] = useState("");
@@ -211,10 +207,10 @@ export function CustomerWorkHub({
     },
   });
 
-  const canManage = (item: WorkItem) =>
-    admin ||
-    item.createdBy?.id === user?.id ||
-    item.assignedTo?.id === user?.id;
+  const canManage = (item: WorkItem) => {
+    const s = String(item.status ?? "OPEN");
+    return s !== "COMPLETED" && s !== "CANCELLED";
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -451,22 +447,28 @@ export function CustomerWorkHub({
 
                 {!compact && isOpen ? (
                   <div className="mt-3 space-y-2 border-t border-border/40 pt-3">
-                    {updates.map((u) => (
-                      <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{u.author?.name ?? "Team"}</span>
-                          <span>{formatDateTime(u.createdAt)}</span>
+                    {updates.map((u) => {
+                      const authorName = u.author?.name ?? "Team member";
+                      return (
+                        <div key={String(u.id)} className="rounded-lg bg-muted/30 px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <UserAvatar name={authorName} size="sm" />
+                              <span className="text-xs font-semibold text-foreground">{authorName}</span>
+                            </div>
+                            <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</span>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap">{String(u.body)}</p>
+                          {u.toStatus ? (
+                            <p className="mt-1 text-xs text-primary">→ {formatLabel(String(u.toStatus))}</p>
+                          ) : null}
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap">{String(u.body)}</p>
-                        {u.toStatus ? (
-                          <p className="mt-1 text-xs text-primary">→ {formatLabel(String(u.toStatus))}</p>
-                        ) : null}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : null}
 
-                {!compact ? (
+                {!compact && manage ? (
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"

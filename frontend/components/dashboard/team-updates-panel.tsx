@@ -4,18 +4,22 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, MessageSquare, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import type { GlobalWorkItem, TeamUpdatesSummary } from "@/lib/team-updates";
 import { formatDateTime, formatLabel } from "@/lib/format";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { cn } from "@/lib/utils";
 
 export function TeamUpdatesPanel({ highlighted = false }: { highlighted?: boolean }) {
+  const { authReady } = useAuthReady();
+
   const { data: summary } = useQuery({
     queryKey: ["team-updates-summary"],
     queryFn: async () => {
       const res = await api.get<TeamUpdatesSummary>("/team-updates/summary");
       return res.data;
     },
+    enabled: authReady,
     refetchInterval: 60_000,
   });
 
@@ -25,6 +29,7 @@ export function TeamUpdatesPanel({ highlighted = false }: { highlighted?: boolea
       const res = await api.get<GlobalWorkItem[]>("/team-updates/feed", { params: { take: 5 } });
       return Array.isArray(res.data) ? res.data : [];
     },
+    enabled: authReady,
     refetchInterval: 60_000,
   });
 

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -22,6 +23,7 @@ type Notification = {
 export default function NotificationsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { authReady } = useAuthReady();
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["notifications"],
@@ -29,6 +31,7 @@ export default function NotificationsPage() {
       const res = await api.get<Notification[]>("/notifications");
       return res.data;
     },
+    enabled: authReady,
   });
 
   const unread = notifications.filter((n) => !n.isRead);

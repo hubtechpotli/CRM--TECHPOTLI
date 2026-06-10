@@ -3,17 +3,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuthReady } from "@/hooks/use-auth-ready";
 import type { TeamUpdatesSummary } from "@/lib/team-updates";
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { TeamUpdatesFeed } from "@/components/team-updates/team-updates-feed";
 
 export default function TeamUpdatesPage() {
+  const { authReady } = useAuthReady();
+
   const { data: summary } = useQuery({
     queryKey: ["team-updates-summary"],
     queryFn: async () => {
       const res = await api.get<TeamUpdatesSummary>("/team-updates/summary");
       return res.data;
     },
+    enabled: authReady,
     refetchInterval: 60_000,
   });
 
