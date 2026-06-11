@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   customerToOption,
   useCustomerDirectorySearch,
 } from "@/hooks/use-customer-directory-search";
+import {
+  isInsideSearchPanel,
+  SearchDropdownPanel,
+  SearchOptionRow,
+} from "@/components/ui/search-dropdown-panel";
 
 export type CustomerOption = { value: string; label: string; sublabel?: string };
 
@@ -57,7 +62,10 @@ export function CustomerSearchField({
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (isInsideSearchPanel(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -134,61 +142,55 @@ export function CustomerSearchField({
         ) : null}
       </div>
 
-      {showDropdown ? (
-        <div
-          data-customer-search-dropdown
-          className="absolute left-0 right-0 top-[calc(100%+4px)] z-[60] overflow-hidden rounded-lg border border-border bg-card shadow-lg"
-        >
-          <ul className="max-h-52 overflow-y-auto p-1">
-            {needsMore ? (
-              <li className="px-3 py-2.5 text-xs text-muted-foreground">
-                Type at least {minChars} characters to search
-              </li>
-            ) : options.length === 0 ? (
-              <li className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground">
-                {isFetching ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Searching…
-                  </>
-                ) : (
-                  "No customers found — try a different search"
-                )}
-              </li>
-            ) : (
-              <>
-                {options.map((opt) => (
-                  <li key={opt.value}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pick(opt)}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-muted",
-                        value === opt.value && "bg-primary/5 text-primary",
-                      )}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{opt.label}</span>
-                        {opt.sublabel ? (
-                          <span className="block truncate text-[10px] text-muted-foreground">{opt.sublabel}</span>
-                        ) : null}
-                      </span>
-                      {value === opt.value ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
-                    </button>
-                  </li>
-                ))}
-                {isFetching ? (
-                  <li className="flex items-center justify-center gap-1.5 border-t border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Updating…
-                  </li>
-                ) : null}
-              </>
-            )}
-          </ul>
-        </div>
-      ) : null}
+      <SearchDropdownPanel
+        open={showDropdown}
+        anchorRef={rootRef}
+        kind="customer"
+        deps={[query, options.length, isFetching]}
+        footer={
+          !needsMore && options.length > 0
+            ? `${options.length} result${options.length === 1 ? "" : "s"}`
+            : undefined
+        }
+      >
+        <ul role="listbox">
+          {needsMore ? (
+            <li className="px-3 py-3 text-xs text-muted-foreground">
+              Type at least {minChars} characters to search
+            </li>
+          ) : options.length === 0 ? (
+            <li className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+              {isFetching ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Searching…
+                </>
+              ) : (
+                "No customers found — try a different search"
+              )}
+            </li>
+          ) : (
+            <>
+              {options.map((opt) => (
+                <li key={opt.value}>
+                  <SearchOptionRow
+                    label={opt.label}
+                    sublabel={opt.sublabel}
+                    selected={value === opt.value}
+                    onSelect={() => pick(opt)}
+                  />
+                </li>
+              ))}
+              {isFetching ? (
+                <li className="flex items-center justify-center gap-1.5 border-t border-border/40 px-3 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Updating…
+                </li>
+              ) : null}
+            </>
+          )}
+        </ul>
+      </SearchDropdownPanel>
     </div>
   );
 }

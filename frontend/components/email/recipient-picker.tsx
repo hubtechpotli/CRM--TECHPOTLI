@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronsUpDown, Loader2, Search } from "lucide-react";
+import { ChevronsUpDown, Loader2, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import {
+  isInsideSearchPanel,
+  SearchDropdownPanel,
+  SearchOptionRow,
+} from "@/components/ui/search-dropdown-panel";
 
 export type RecipientType = "lead" | "customer";
 
@@ -21,6 +26,13 @@ function recipientLabel(r: Recipient, type: RecipientType) {
   const person = type === "lead" ? r.contactName : r.ownerName;
   const email = r.email ? ` · ${r.email}` : " · no email";
   return `${r.companyName}${person ? ` — ${person}` : ""}${email}`;
+}
+
+function recipientSublabel(r: Recipient, type: RecipientType) {
+  const person = (type === "lead" ? r.contactName : r.ownerName) || "—";
+  const email = r.email ? ` · ${r.email}` : " · No email";
+  const status = r.status ? ` · ${r.status}` : "";
+  return `${person}${email}${status}`;
 }
 
 function matchesQuery(r: Recipient, type: RecipientType, q: string) {
@@ -98,9 +110,10 @@ export function RecipientPicker({
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (isInsideSearchPanel(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -133,6 +146,26 @@ export function RecipientPicker({
     }
   }
 
+  const panelHeader = (
+    <div className="flex items-center gap-2 px-3">
+      <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={`Type to search ${type}s instantly…`}
+        className="h-11 w-full bg-transparent text-sm outline-none"
+        autoFocus
+      />
+      {isLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" /> : null}
+    </div>
+  );
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -152,68 +185,38 @@ export function RecipientPicker({
         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </button>
 
-      {open ? (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-border bg-background shadow-lg">
-          <div className="flex items-center gap-2 border-b border-border px-3">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setOpen(true);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={`Type to search ${type}s instantly…`}
-              className="h-11 w-full bg-transparent text-sm outline-none"
-              autoFocus
-            />
-            {isLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" /> : null}
-          </div>
-
-          <ul className="max-h-[50vh] overflow-y-auto p-1 sm:max-h-64" role="listbox">
-            {!isLoading && displayed.length === 0 ? (
-              <li className="py-6 text-center text-sm text-muted-foreground">
-                {query.trim() ? `No ${type}s match "${query}"` : `No ${type}s found`}
-              </li>
-            ) : null}
-            {displayed.map((r, idx) => (
-              <li key={r.id} role="option" aria-selected={value?.id === r.id}>
-                <button
-                  type="button"
-                  onMouseEnter={() => setHighlight(idx)}
-                  onClick={() => selectRecipient(r)}
-                  className={cn(
-                    "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-3 text-left text-sm transition",
-                    highlight === idx ? "bg-primary/10" : "hover:bg-muted/60",
-                  )}
-                >
-                  <Check
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-primary",
-                      value?.id === r.id ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{r.companyName}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {(type === "lead" ? r.contactName : r.ownerName) || "—"}
-                      {r.email ? ` · ${r.email}` : " · No email"}
-                      {r.status ? ` · ${r.status}` : ""}
-                    </p>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <p className="border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
-            {displayed.length} result{displayed.length === 1 ? "" : "s"}
-            {debouncedQuery.length >= 2 ? " · server search" : " · instant filter"}
-          </p>
-        </div>
-      ) : null}
+      <SearchDropdownPanel
+        open={open}
+        anchorRef={containerRef}
+        kind="recipient"
+        header={panelHeader}
+        deps={[query, displayed.length, isLoading, highlight]}
+        footer={
+          displayed.length > 0
+            ? `${displayed.length} result${displayed.length === 1 ? "" : "s"}${debouncedQuery.length >= 2 ? " · server search" : " · instant filter"}`
+            : undefined
+        }
+      >
+        <ul role="listbox">
+          {!isLoading && displayed.length === 0 ? (
+            <li className="py-6 text-center text-sm text-muted-foreground">
+              {query.trim() ? `No ${type}s match "${query}"` : `No ${type}s found`}
+            </li>
+          ) : null}
+          {displayed.map((r, idx) => (
+            <li key={r.id} role="option" aria-selected={value?.id === r.id}>
+              <SearchOptionRow
+                label={r.companyName}
+                sublabel={recipientSublabel(r, type)}
+                selected={value?.id === r.id}
+                highlighted={highlight === idx}
+                onMouseEnter={() => setHighlight(idx)}
+                onSelect={() => selectRecipient(r)}
+              />
+            </li>
+          ))}
+        </ul>
+      </SearchDropdownPanel>
     </div>
   );
 }

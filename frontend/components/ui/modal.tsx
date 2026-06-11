@@ -47,7 +47,8 @@ export function Modal({
             const target = e.target as HTMLElement | null;
             if (
               target?.closest("[data-searchable-select-panel]") ||
-              target?.closest("[data-customer-search-dropdown]")
+              target?.closest("[data-customer-search-dropdown]") ||
+              target?.closest("[data-recipient-picker-panel]")
             ) {
               e.preventDefault();
             }
@@ -56,7 +57,8 @@ export function Modal({
             const target = e.target as HTMLElement | null;
             if (
               target?.closest("[data-searchable-select-panel]") ||
-              target?.closest("[data-customer-search-dropdown]")
+              target?.closest("[data-customer-search-dropdown]") ||
+              target?.closest("[data-recipient-picker-panel]")
             ) {
               e.preventDefault();
             }
@@ -65,7 +67,8 @@ export function Modal({
             const target = e.target as HTMLElement | null;
             if (
               target?.closest("[data-searchable-select-panel]") ||
-              target?.closest("[data-customer-search-dropdown]")
+              target?.closest("[data-customer-search-dropdown]") ||
+              target?.closest("[data-recipient-picker-panel]")
             ) {
               e.preventDefault();
             }
