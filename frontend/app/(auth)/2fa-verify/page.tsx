@@ -8,6 +8,7 @@ import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
 import { useAuthStore } from "@/store/auth-store";
+import { getRateLimitMessage } from "@/lib/api-error";
 
 export default function TwoFactorVerifyPage() {
   const router = useRouter();
@@ -54,9 +55,12 @@ export default function TwoFactorVerifyPage() {
         router.replace("/dashboard");
       }
     } catch (err) {
-      const message = isAxiosError(err)
-        ? (err.response?.data as { message?: string })?.message ?? err.message
-        : "Verification failed";
+      const rateLimit = getRateLimitMessage(err);
+      const message = rateLimit
+        ? rateLimit
+        : isAxiosError(err)
+          ? (err.response?.data as { message?: string })?.message ?? err.message
+          : "Verification failed";
       setError(Array.isArray(message) ? message.join(", ") : String(message));
     } finally {
       setLoading(false);

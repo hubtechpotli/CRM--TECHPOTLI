@@ -12,6 +12,7 @@ import { TechPotliLogo } from "@/components/brand/techpotli-logo";
 import { AuthCardShell } from "@/components/auth/auth-card-shell";
 import { cn } from "@/lib/utils";
 import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
+import { getRateLimitMessage } from "@/lib/api-error";
 
 type LoginResponse = {
   requires2FA?: boolean;
@@ -85,7 +86,10 @@ export default function LoginPage() {
       setError("Unexpected response from server.");
     } catch (err) {
       let message = "Sign in failed";
-      if (isAxiosError(err)) {
+      const rateLimit = getRateLimitMessage(err);
+      if (rateLimit) {
+        message = rateLimit;
+      } else if (isAxiosError(err)) {
         const apiMessage = (err.response?.data as { message?: string | string[] })?.message;
         if (apiMessage) {
           message = Array.isArray(apiMessage) ? apiMessage.join(", ") : apiMessage;

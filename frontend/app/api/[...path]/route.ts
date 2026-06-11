@@ -8,6 +8,23 @@ function getApiOrigin(): string {
 
 const HOP_BY_HOP = new Set(["connection", "keep-alive", "transfer-encoding", "te", "upgrade"]);
 
+function ensureForwardedFor(req: NextRequest, headers: Headers) {
+  const existing =
+    headers.get("x-forwarded-for") ||
+    req.headers.get("x-forwarded-for") ||
+    req.headers.get("x-vercel-forwarded-for");
+  if (existing) {
+    headers.set("X-Forwarded-For", existing);
+    return;
+  }
+  const clientIp =
+    req.headers.get("x-real-ip") ||
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-vercel-forwarded-for") ||
+    "127.0.0.1";
+  headers.set("X-Forwarded-For", clientIp);
+}
+
 async function proxyRequest(req: NextRequest, pathSegments: string[]) {
   const origin = getApiOrigin();
   if (!origin) {
@@ -28,6 +45,7 @@ async function proxyRequest(req: NextRequest, pathSegments: string[]) {
     if (lower === "host" || HOP_BY_HOP.has(lower)) return;
     headers.set(key, value);
   });
+  ensureForwardedFor(req, headers);
 
   const init: RequestInit = {
     method: req.method,

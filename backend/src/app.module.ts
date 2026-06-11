@@ -5,8 +5,9 @@ import { bullConnectionFactory } from './jobs/bull.config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { RequestTimingMiddleware } from './common/middleware/request-timing.middleware';
 import { RequestTimingInterceptor } from './common/interceptors/request-timing.interceptor';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { RedisThrottlerStorage } from './common/redis-throttler.storage';
+import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
@@ -113,7 +114,7 @@ const cronJobModules =
   ],
   providers: [
     EncryptionService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: MustChangePasswordGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
