@@ -9,7 +9,6 @@ import {
   Calendar,
   ChevronDown,
   LogOut,
-  Plus,
   Settings,
   User,
 } from "lucide-react";
@@ -25,7 +24,7 @@ import { api } from "@/lib/api";
 import type { TeamUpdatesSummary } from "@/lib/team-updates";
 import { TechPotliLogo } from "@/components/brand/techpotli-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { NAV_GROUPS, PAGE_CTAS, roleLabel } from "@/lib/shell-nav-groups";
+import { NAV_GROUPS, roleLabel } from "@/lib/shell-nav-groups";
 import { resolvePageMeta } from "@/lib/page-meta";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
@@ -33,14 +32,6 @@ import {
   getRouteColor,
   shouldShowSectionHero,
 } from "@/lib/nav-colors";
-
-function getPageCta(pathname: string) {
-  if (PAGE_CTAS[pathname]) return PAGE_CTAS[pathname];
-  const match = Object.keys(PAGE_CTAS).find(
-    (k) => k !== "/dashboard" && pathname.startsWith(k),
-  );
-  return match ? PAGE_CTAS[match] : PAGE_CTAS["/dashboard"];
-}
 
 const PREFETCH_ROUTES = [
   "/dashboard",
@@ -92,7 +83,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
   const pageMeta = resolvePageMeta(pathname);
-  const cta = getPageCta(pathname);
   const routeColor = getRouteColor(pathname);
   const PageIcon = getPageIcon(pathname);
   const showHero = shouldShowSectionHero(pathname);
@@ -290,10 +280,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <GlobalSearch />
             </div>
             <div className="flex flex-1 items-center justify-end gap-1.5">
-              <Link href={cta.href} className={cn(routeColor.btn, "!text-xs")}>
-                <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{cta.label}</span>
-              </Link>
               <Link href="/leads" className="crm-btn-ghost !px-2.5" title="Follow-ups">
                 <Calendar className="h-4 w-4" />
               </Link>

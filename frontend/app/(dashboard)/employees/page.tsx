@@ -14,6 +14,7 @@ import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/dashboard/data-table";
+import { Plus } from "lucide-react";
 import { ListActionButton } from "@/components/dashboard/list-actions";
 import { Modal } from "@/components/ui/modal";
 import { EmployeeForm } from "@/components/employees/employee-form";
@@ -73,7 +74,8 @@ export default function EmployeesPage() {
       title=""
       actions={
         <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
-          + New Employee
+          <Plus className="h-3.5 w-3.5" />
+          Add Employee
         </button>
       }
     >

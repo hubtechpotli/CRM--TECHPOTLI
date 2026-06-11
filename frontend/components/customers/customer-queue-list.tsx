@@ -117,9 +117,9 @@ export function CustomerListTable({
             return (
               <div className="flex items-center gap-3">
                 <CompanyAvatar name={String(row.companyName ?? "?")} className="h-8 w-8 text-xs" />
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-foreground">{String(row.companyName ?? "—")}</p>
+                    <p className="truncate font-semibold text-foreground">{String(row.companyName ?? "—")}</p>
                     {openCount > 0 ? (
                       <span
                         className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
@@ -129,7 +129,7 @@ export function CustomerListTable({
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-xs text-muted-foreground">{String(row.ownerName ?? "")}</p>
+                  <p className="truncate text-xs text-muted-foreground">{String(row.ownerName ?? "")}</p>
                 </div>
               </div>
             );

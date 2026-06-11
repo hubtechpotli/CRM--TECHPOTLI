@@ -76,24 +76,31 @@ export function CustomerDomainsPanel({ customerId }: { customerId: string }) {
   const domainsKey = ["customer-domains", customerId] as const;
 
   const saveMutation = useOptimisticMutation({
-    mutationFn: async () => {
-      const body = toBody(form);
-      if (editing) {
-        const res = await api.patch(`/customers/${customerId}/domains/${editing.id}`, body);
+    mutationFn: async ({
+      editingId,
+      body,
+    }: {
+      editingId?: string;
+      body: Record<string, unknown>;
+    }) => {
+      if (editingId) {
+        const res = await api.patch(`/customers/${customerId}/domains/${editingId}`, body);
         return res.data;
       }
       const res = await api.post(`/customers/${customerId}/domains`, body);
       return res.data;
     },
+    retry: 0,
     snapshotKeys: [domainsKey],
     invalidateKeys: [domainsKey, ["customer-timeline", customerId]],
-    onMutate: () => {
-      const body = toBody(form);
-      if (editing) {
-        patchListItem(queryClient, domainsKey, String(editing.id), body);
+    onMutate: ({ editingId, body }) => {
+      if (editingId) {
+        patchListItem(queryClient, domainsKey, editingId, body);
       } else {
         appendListItem(queryClient, domainsKey, { id: createTempId(), ...body });
       }
+    },
+    onSuccess: () => {
       setShowModal(false);
       setEditing(null);
       setForm(emptyForm);
@@ -198,7 +205,10 @@ export function CustomerDomainsPanel({ customerId }: { customerId: string }) {
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            saveMutation.mutate();
+            saveMutation.mutate({
+              editingId: editing ? String(editing.id) : undefined,
+              body: toBody(form),
+            });
           }}
           className="space-y-4"
         >

@@ -104,3 +104,16 @@ function hashName(name: string) {
 export function avatarColorFor(name: string): AvatarColor {
   return AVATAR_PALETTE[hashName(name) % AVATAR_PALETTE.length];
 }
+
+/** Deterministic initials: "Rahul Sharma" → RS, "TechPotli" → TE */
+export function initialsForName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+  if (parts.length === 1) {
+    const word = parts[0];
+    return word.length >= 2 ? word.slice(0, 2).toUpperCase() : word[0]?.toUpperCase() ?? "?";
+  }
+  return "?";
+}

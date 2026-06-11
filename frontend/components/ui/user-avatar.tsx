@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { avatarColorFor } from "@/lib/avatar-colors";
+import { avatarColorFor, initialsForName } from "@/lib/avatar-colors";
 
 export function UserAvatar({
   name,
@@ -9,7 +9,7 @@ export function UserAvatar({
 }: {
   name: string;
   src?: string | null;
-  size?: "sm" | "md" | "lg" | "xs";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
 }) {
   const sizes = {
@@ -17,8 +17,9 @@ export function UserAvatar({
     sm: "h-7 w-7 text-[10px]",
     md: "h-9 w-9 text-xs",
     lg: "h-11 w-11 text-sm",
+    xl: "h-16 w-16 text-lg",
   };
-  const initial = name.trim() ? name.trim()[0].toUpperCase() : "?";
+  const initial = initialsForName(name);
   const color = avatarColorFor(name);
 
   if (src) {

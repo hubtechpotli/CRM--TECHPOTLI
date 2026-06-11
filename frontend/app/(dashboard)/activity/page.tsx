@@ -6,12 +6,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { activityLink, formatLabel, timeAgo } from "@/lib/format";
+import { actionBadgeFor, moduleColorFor } from "@/lib/activity-ui";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { FormField, SelectInput } from "@/components/ui/form-field";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { useRouteColor } from "@/hooks/use-route-color";
+import { cn } from "@/lib/utils";
 
 type ActivityItem = {
   id: string;
@@ -26,7 +29,7 @@ type ActivityItem = {
 
 type ActivityResponse = { items: ActivityItem[]; total: number };
 
-const MODULES = ["", "lead", "customer", "project", "invoice", "quotation"];
+const MODULES = ["", "lead", "customer", "project", "invoice", "quotation", "payment", "expense", "support"];
 
 export default function ActivityPage() {
   const routeColor = useRouteColor();
@@ -54,7 +57,7 @@ export default function ActivityPage() {
       title=""
       toolbar={
         <>
-          <FormField label="Module" className="w-36">
+          <FormField label="Module" className="w-40">
             <SelectInput
               value={module}
               onChange={setModule}
@@ -90,26 +93,72 @@ export default function ActivityPage() {
             description="Team actions across leads, customers, and billing will show here."
           />
         ) : (
-          <ul className="divide-y divide-border/40">
-            {items.map((item) => {
+          <ul className="relative space-y-0">
+            <div className="absolute bottom-2 left-5 top-2 w-px bg-border/70" aria-hidden />
+            {items.map((item, index) => {
               const href = activityLink(item.module, item.recordId);
+              const actor = item.user?.name ?? "System";
+              const modColor = moduleColorFor(item.module);
+              const actBadge = actionBadgeFor(item.action);
+
               return (
-                <li key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Activity className="h-4 w-4" />
+                <li
+                  key={item.id}
+                  className="relative flex gap-3 rounded-xl px-1 py-3 transition hover:bg-muted/30 first:pt-0 last:pb-0"
+                >
+                  <div className="relative z-10 shrink-0 pt-0.5">
+                    <UserAvatar name={actor} size="sm" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground">
-                      <span className="font-medium">{item.user?.name ?? "System"}</span>{" "}
-                      <span className="text-muted-foreground">{formatLabel(item.action)}</span>{" "}
-                      <span className="font-medium">{formatLabel(item.module)}</span>
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">{timeAgo(item.createdAt)}</p>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="min-w-0 text-sm leading-snug text-foreground">
+                        <span className="font-semibold">{actor}</span>{" "}
+                        <span className="text-muted-foreground">{actBadge.label.toLowerCase()}</span>{" "}
+                        <span className={cn("font-medium", modColor.text)}>{formatLabel(item.module)}</span>
+                      </p>
+                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                        {index === 0 ? (
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                              routeColor.light,
+                              routeColor.text,
+                            )}
+                          >
+                            Latest
+                          </span>
+                        ) : null}
+                        <span
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                            actBadge.light,
+                            actBadge.text,
+                            actBadge.border,
+                          )}
+                        >
+                          {actBadge.label}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                            modColor.light,
+                            modColor.text,
+                            modColor.border,
+                          )}
+                        >
+                          {formatLabel(item.module)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{timeAgo(item.createdAt)}</p>
                   </div>
                   {href ? (
                     <Link
                       href={href}
-                      className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      className={cn(
+                        "flex shrink-0 items-center gap-1 self-center text-xs font-semibold transition hover:underline",
+                        modColor.text,
+                      )}
                     >
                       View
                       <ExternalLink className="h-3 w-3" />

@@ -10,8 +10,9 @@ import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { DataTable } from "@/components/dashboard/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
 import { RenewalForm } from "@/components/renewals/renewal-form";
@@ -64,6 +65,19 @@ export default function RenewalsPage() {
         ) : (
           <DataTable
             rows={rows}
+            emptyState={
+              <EmptyState
+                icon={RefreshCw}
+                title="No renewals yet"
+                description="Track upcoming domain, hosting, and service renewals."
+                action={
+                  <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Renewal
+                  </button>
+                }
+              />
+            }
             columns={[
               {
                 key: "customer",

@@ -12,7 +12,11 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { FormField, TextInput } from "@/components/ui/form-field";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
+import { avatarColorFor } from "@/lib/avatar-colors";
+import { useRouteColor } from "@/hooks/use-route-color";
+import { cn } from "@/lib/utils";
 
 type ProfileData = {
   id: string;
@@ -26,6 +30,7 @@ type ProfileData = {
 };
 
 export default function ProfilePage() {
+  const routeColor = useRouteColor();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -49,7 +54,8 @@ export default function ProfilePage() {
     if (profile?.name) setName(profile.name);
   }, [profile?.name]);
 
-  const displayName = name || profile?.name || "";
+  const displayName = name || profile?.name || "User";
+  const avatarColor = avatarColorFor(displayName);
 
   const authMeKey = ["auth-me"] as const;
 
@@ -122,8 +128,46 @@ export default function ProfilePage() {
         </GlassCard>
       ) : (
         <>
-          <GlassCard>
-            <h2 className="mb-4 text-sm font-semibold">Account</h2>
+          <GlassCard className={cn("overflow-visible", routeColor.border)}>
+            <div className="mb-6 flex flex-col items-center gap-4 border-b border-border/60 pb-6 sm:flex-row sm:items-center">
+              <div className="relative">
+                <UserAvatar name={displayName} size="xl" className="ring-4 ring-white shadow-md dark:ring-card" />
+                <span
+                  className={cn(
+                    "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-card",
+                    avatarColor.solid,
+                  )}
+                  aria-hidden
+                />
+              </div>
+              <div className="min-w-0 text-center sm:text-left">
+                <h2 className="truncate text-lg font-semibold tracking-tight text-foreground">{displayName}</h2>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">{profile?.email}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                      avatarColor.light,
+                      avatarColor.text,
+                      avatarColor.border,
+                    )}
+                  >
+                    {formatLabel(profile?.role ?? "")}
+                  </span>
+                  {profile?.department ? (
+                    <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      {profile.department}
+                    </span>
+                  ) : null}
+                  {profile?.designation ? (
+                    <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      {profile.designation}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <h3 className="mb-4 text-sm font-semibold">Account details</h3>
             <form onSubmit={handleNameSubmit} className="space-y-4">
               {saveError ? (
                 <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600">{saveError}</p>
@@ -164,7 +208,7 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   disabled={saveMutation.isPending}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  className={cn(routeColor.btn, "disabled:opacity-60")}
                 >
                   {saveMutation.isPending ? "Saving…" : "Save name"}
                 </button>

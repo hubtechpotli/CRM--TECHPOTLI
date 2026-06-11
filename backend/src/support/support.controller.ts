@@ -19,8 +19,18 @@ export class SupportController {
   }
 
   @Post()
-  create(@CurrentUser() user: JwtPayload, @Body() body: Record<string, unknown>) {
-    return this.support.create(body as Parameters<SupportService['create']>[0], user.sub);
+  create(
+    @CurrentUser() user: JwtPayload,
+    @Body()
+    body: {
+      customerId: string;
+      subject: string;
+      description: string;
+      priority?: string;
+      assignedToId?: string;
+    },
+  ) {
+    return this.support.create(body, user.sub);
   }
 
   @Patch(':id')

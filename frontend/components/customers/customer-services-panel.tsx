@@ -79,34 +79,40 @@ export function CustomerServicesPanel({ customerId }: { customerId: string }) {
   ] as const;
 
   const createMutation = useOptimisticMutation({
-    mutationFn: async () => {
-      const res = await api.post(`/customers/${customerId}/services`, buildBody(form));
+    mutationFn: async (body: Record<string, unknown>) => {
+      const res = await api.post(`/customers/${customerId}/services`, body);
       return res.data;
     },
+    retry: 0,
     snapshotKeys: [servicesKey],
     invalidateKeys: [...serviceInvalidateKeys],
-    onMutate: () => {
+    onMutate: (body) => {
       appendListItem(queryClient, servicesKey, {
         id: createTempId(),
-        ...buildBody(form),
+        ...body,
       });
-      setShowAdd(false);
-      setForm(emptyForm);
     },
+    onSuccess: () => closeModal(),
   });
 
   const updateMutation = useOptimisticMutation({
-    mutationFn: async () => {
-      const res = await api.patch(`/customers/${customerId}/services/${editing!.id}`, buildBody(form));
+    mutationFn: async ({
+      serviceId,
+      body,
+    }: {
+      serviceId: string;
+      body: Record<string, unknown>;
+    }) => {
+      const res = await api.patch(`/customers/${customerId}/services/${serviceId}`, body);
       return res.data;
     },
+    retry: 0,
     snapshotKeys: [servicesKey],
     invalidateKeys: [...serviceInvalidateKeys],
-    onMutate: () => {
-      patchListItem(queryClient, servicesKey, String(editing!.id), buildBody(form));
-      setEditing(null);
-      setForm(emptyForm);
+    onMutate: ({ serviceId, body }) => {
+      patchListItem(queryClient, servicesKey, serviceId, body);
     },
+    onSuccess: () => closeModal(),
   });
 
   const toggleActiveMutation = useOptimisticMutation({
@@ -308,8 +314,16 @@ export function CustomerServicesPanel({ customerId }: { customerId: string }) {
 
       <Modal open={modalOpen} onClose={closeModal} title={editing ? "Edit service" : "Add service"} size="lg">
         {editing
-          ? renderForm(() => updateMutation.mutate(), updateMutation.isPending, "Save changes")
-          : renderForm(() => createMutation.mutate(), createMutation.isPending, "Add service")}
+          ? renderForm(
+              () =>
+                updateMutation.mutate({
+                  serviceId: String(editing.id),
+                  body: buildBody(form),
+                }),
+              updateMutation.isPending,
+              "Save changes",
+            )
+          : renderForm(() => createMutation.mutate(buildBody(form)), createMutation.isPending, "Add service")}
       </Modal>
     </div>
   );

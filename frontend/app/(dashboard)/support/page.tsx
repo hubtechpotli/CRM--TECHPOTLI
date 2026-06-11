@@ -1,23 +1,30 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { LifeBuoy } from "lucide-react";
+import { LifeBuoy, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import { formatDate, formatLabel } from "@/lib/format";
+import { isTempId } from "@/lib/optimistic-mutation";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { DataTable } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
+import { Modal } from "@/components/ui/modal";
+import { SupportTicketForm } from "@/components/support/support-ticket-form";
 import { useRouteColor } from "@/hooks/use-route-color";
 
 type TicketRow = Record<string, unknown>;
 
 export default function SupportPage() {
   const routeColor = useRouteColor();
+  const router = useRouter();
   const { authReady } = useAuthReady();
+  const [showNew, setShowNew] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["support-tickets"],
@@ -32,7 +39,16 @@ export default function SupportPage() {
   const rows = Array.isArray(data) ? data : [];
 
   return (
-    <CrmPageShell hideHeader title="">
+    <CrmPageShell
+      hideHeader
+      title=""
+      actions={
+        <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+          <Plus className="h-3.5 w-3.5" />
+          New Ticket
+        </button>
+      }
+    >
       <SectionCard accent={routeColor}>
         {isLoading ? (
           <ListPageSkeleton rows={6} columns={4} />
@@ -51,6 +67,12 @@ export default function SupportPage() {
                 icon={LifeBuoy}
                 title="No support tickets"
                 description="Customer support requests will appear here."
+                action={
+                  <button type="button" onClick={() => setShowNew(true)} className={routeColor.btn}>
+                    <Plus className="h-3.5 w-3.5" />
+                    New Ticket
+                  </button>
+                }
               />
             }
             columns={[
@@ -86,6 +108,16 @@ export default function SupportPage() {
           />
         )}
       </SectionCard>
+      <Modal open={showNew} onOpenChange={setShowNew} title="New support ticket" size="lg">
+        <SupportTicketForm
+          onCancel={() => setShowNew(false)}
+          onSuccess={(data) => {
+            setShowNew(false);
+            const id = String(data.id ?? "");
+            if (id && !isTempId(id)) router.push(`/support/${id}`);
+          }}
+        />
+      </Modal>
     </CrmPageShell>
   );
 }

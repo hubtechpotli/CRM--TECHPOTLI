@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -11,7 +11,16 @@ export class EncryptionService {
     this.key = Buffer.from(hex.slice(0, 64), 'hex');
   }
 
+  private assertKeyReady(): void {
+    if (this.key.length !== 32) {
+      throw new BadRequestException(
+        'Credential storage is not configured on this server. Set ENCRYPTION_KEY (64 hex characters) in the backend environment.',
+      );
+    }
+  }
+
   encrypt(plaintext: string): string {
+    this.assertKeyReady();
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', this.key, iv);
     const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -20,6 +29,7 @@ export class EncryptionService {
   }
 
   decrypt(payload: string): string {
+    this.assertKeyReady();
     const [ivHex, tagHex, dataHex] = payload.split(':');
     const decipher = crypto.createDecipheriv(
       'aes-256-gcm',

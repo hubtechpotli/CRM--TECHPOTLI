@@ -10,6 +10,7 @@ export function CrmPageShell({
   title,
   description,
   hideHeader,
+  actions,
   tabs,
   tabValue,
   onTabChange,
@@ -21,7 +22,6 @@ export function CrmPageShell({
   title: string;
   description?: string;
   hideHeader?: boolean;
-  /** @deprecated Actions live in the top bar — not rendered here */
   actions?: React.ReactNode;
   tabs?: StatusTab[];
   tabValue?: string;
@@ -53,6 +53,10 @@ export function CrmPageShell({
 
       {tabs && tabValue !== undefined && onTabChange ? (
         <StatusTabs tabs={tabs} value={tabValue} onChange={onTabChange} accent={routeColor} />
+      ) : null}
+
+      {actions ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>
       ) : null}
 
       {toolbar ? (

@@ -35,18 +35,29 @@ export const LeadSourceChart = memo(function LeadSourceChart({
   return (
     <SectionCard
       title="Lead Sources"
-      subtitle={topSource ? `Top: ${topSource}` : "By channel"}
+      subtitle="By channel"
       icon={PieChartIcon}
       compact
       noPadding
     >
-      <div className="p-3 pt-1">
+      <div className="space-y-3 p-3 pt-2 sm:p-4">
+        {topSource ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Top source
+            </span>
+            <span className="inline-flex max-w-full items-center rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-xs font-semibold text-foreground">
+              <span className="truncate">{topSource}</span>
+            </span>
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="h-36 animate-pulse rounded-lg bg-muted/60" />
         ) : chartData.length === 0 ? (
           <p className="py-8 text-center text-xs text-muted-foreground">No lead source data yet.</p>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
             <div className="relative h-32 w-32 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -83,20 +94,20 @@ export const LeadSourceChart = memo(function LeadSourceChart({
                 </p>
               </div>
             </div>
-            <ul className="min-w-0 flex-1 space-y-1.5">
+            <ul className="min-w-0 w-full flex-1 space-y-2">
               {chartData.map((item, i) => {
                 const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
                 return (
                   <li key={item.name}>
-                    <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                      <span className="flex items-center gap-2 font-medium">
+                    <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                      <span className="flex min-w-0 items-center gap-2 font-medium">
                         <span
-                          className="h-2.5 w-2.5 rounded-full"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ background: COLORS[i % COLORS.length] }}
                         />
-                        {item.name}
+                        <span className="truncate">{item.name}</span>
                       </span>
-                      <span className="tabular-nums text-muted-foreground">
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
                         {item.value} · {pct}%
                       </span>
                     </div>

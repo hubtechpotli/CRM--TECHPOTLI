@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { avatarColorFor, initialsForName } from "@/lib/avatar-colors";
 import { getPriorityMeta, getStatusMeta } from "@/lib/lead-ui";
 
 export function LeadStatusBadge({
@@ -116,15 +117,17 @@ export function CompanyAvatar({
   name: string;
   className?: string;
 }) {
-  const initial = name.trim() ? name.trim()[0].toUpperCase() : "?";
+  const color = avatarColorFor(name);
+  const initials = initialsForName(name);
   return (
     <div
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-700 text-sm font-semibold text-white",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white shadow-sm",
+        color.solid,
         className,
       )}
     >
-      {initial}
+      {initials}
     </div>
   );
 }

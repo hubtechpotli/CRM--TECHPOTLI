@@ -738,6 +738,17 @@ export class CustomersService {
     return this.prisma.domain.findMany({ where: { customerId } });
   }
 
+  private parseRequiredDate(value: Date | string | undefined, field: string): Date {
+    if (value === undefined || value === null || value === '') {
+      throw new BadRequestException(`${field} is required`);
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${field} is invalid`);
+    }
+    return parsed;
+  }
+
   async createDomain(
     customerId: string,
     data: {
@@ -752,15 +763,18 @@ export class CustomersService {
       nameservers?: string[];
     },
   ) {
+    const domainName = data.domainName?.trim();
+    if (!domainName) throw new BadRequestException('Domain name is required');
+    const expiryDate = this.parseRequiredDate(data.expiryDate, 'Expiry date');
     const domain = await this.prisma.domain.create({
       data: {
         customerId,
-        domainName: data.domainName,
+        domainName,
         registrar: data.registrar,
         usernameEnc: data.username ? this.encryption.encrypt(data.username) : undefined,
         passwordEnc: data.password ? this.encryption.encrypt(data.password) : undefined,
-        purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
-        expiryDate: new Date(data.expiryDate),
+        purchaseDate: data.purchaseDate ? this.parseRequiredDate(data.purchaseDate, 'Purchase date') : undefined,
+        expiryDate,
         autoRenewEnabled: data.autoRenewEnabled ?? false,
         renewalAmount: data.renewalAmount,
         nameservers: data.nameservers ?? [],
@@ -834,16 +848,19 @@ export class CustomersService {
       renewalAmount?: number;
     },
   ) {
+    const provider = data.provider?.trim();
+    if (!provider) throw new BadRequestException('Hosting provider is required');
+    const renewalDate = this.parseRequiredDate(data.renewalDate, 'Renewal date');
     const hosting = await this.prisma.hostingAccount.create({
       data: {
         customerId,
-        provider: data.provider,
+        provider,
         controlPanelUrl: data.controlPanelUrl,
         usernameEnc: data.username ? this.encryption.encrypt(data.username) : undefined,
         passwordEnc: data.password ? this.encryption.encrypt(data.password) : undefined,
         serverIp: data.serverIp,
         hostingPlan: data.hostingPlan,
-        renewalDate: new Date(data.renewalDate),
+        renewalDate,
         renewalAmount: data.renewalAmount,
       },
     });

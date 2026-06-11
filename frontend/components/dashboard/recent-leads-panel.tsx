@@ -55,9 +55,9 @@ export function RecentLeadsPanel({
       render: (row: LeadRow) => (
         <Link href={`/leads/${row.id}`} className="flex items-center gap-3 group">
           <CompanyAvatar name={String(row.companyName ?? "?")} className="h-8 w-8 text-xs" />
-          <div>
-            <p className="font-medium group-hover:text-primary">{String(row.companyName ?? "—")}</p>
-            <p className="text-[11px] text-muted-foreground">{String(row.contactName ?? "")}</p>
+          <div className="min-w-0">
+            <p className="truncate font-medium group-hover:text-primary">{String(row.companyName ?? "—")}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{String(row.contactName ?? "")}</p>
           </div>
         </Link>
       ),
@@ -103,7 +103,7 @@ export function RecentLeadsPanel({
     {
       key: "status",
       label: "Status",
-      render: (row: LeadRow) => <LeadStatusBadge status={String(row.status ?? "")} />,
+      render: (row: LeadRow) => <LeadStatusBadge status={String(row.status ?? "")} showIcon />,
     },
     {
       key: "lastActivity",

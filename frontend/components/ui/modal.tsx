@@ -71,14 +71,14 @@ export function Modal({
             }
           }}
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-xl outline-none",
+            "fixed left-1/2 top-1/2 z-50 flex max-h-[min(90vh,820px)] w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-card shadow-xl outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
             sizes[size],
             className,
           )}
         >
           {(title || description) ? (
-            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
               <div>
                 {title ? (
                   <Dialog.Title className="text-[15px] font-semibold tracking-tight text-foreground">
@@ -96,7 +96,14 @@ export function Modal({
               </Dialog.Close>
             </div>
           ) : null}
-          <div className={title || description ? "bg-card" : "relative bg-card"}>{children}</div>
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto bg-card",
+              title || description ? "crm-card-padding" : "crm-card-padding",
+            )}
+          >
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

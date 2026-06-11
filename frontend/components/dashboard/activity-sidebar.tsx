@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { memo } from "react";
-import { Activity, FileText, Phone, UserPlus } from "lucide-react";
+import { Activity } from "lucide-react";
 import { SectionCard } from "@/components/dashboard/section-card";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { activityLink, formatLabel, timeAgo } from "@/lib/format";
+import { actionBadgeFor, moduleColorFor } from "@/lib/activity-ui";
+import { cn } from "@/lib/utils";
 
 type ActivityItem = {
   id: string;
@@ -13,20 +16,6 @@ type ActivityItem = {
   recordId?: string | null;
   createdAt: string;
   user?: { name: string; email: string } | null;
-};
-
-const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  lead: UserPlus,
-  customer: UserPlus,
-  invoice: FileText,
-  project: FileText,
-};
-
-const MODULE_COLORS: Record<string, string> = {
-  lead: "bg-muted text-foreground",
-  customer: "bg-muted text-foreground",
-  invoice: "bg-muted text-foreground",
-  project: "bg-muted text-foreground",
 };
 
 export const ActivitySidebar = memo(function ActivitySidebar({
@@ -60,28 +49,44 @@ export const ActivitySidebar = memo(function ActivitySidebar({
       ) : items.length === 0 ? (
         <p className="py-3 text-center text-xs text-muted-foreground">No recent activity.</p>
       ) : (
-        <ul className="relative space-y-0">
-          <div className="absolute bottom-1 left-3.5 top-1 w-px bg-border" aria-hidden />
+        <ul className="relative space-y-0 pr-1">
+          <div className="absolute bottom-1 left-4 top-1 w-px bg-border" aria-hidden />
           {items.map((item, index) => {
-            const Icon = MODULE_ICONS[item.module] ?? Phone;
-            const colorClass = MODULE_COLORS[item.module] ?? "bg-primary/10 text-primary";
             const link = activityLink(item.module, item.recordId);
             const actor = item.user?.name ?? "System";
+            const modColor = moduleColorFor(item.module);
+            const actBadge = actionBadgeFor(item.action);
 
             return (
-              <li key={item.id} className="relative flex gap-2 pb-2.5 last:pb-0">
-                <div
-                  className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-card ${colorClass}`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
+              <li key={item.id} className="relative flex items-start gap-2.5 pb-3 last:pb-0">
+                <div className="relative z-10 shrink-0 pt-0.5">
+                  <UserAvatar name={actor} size="sm" />
                 </div>
                 <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-xs leading-snug">
-                    <span className="font-semibold text-foreground">{actor}</span>{" "}
-                    <span className="text-muted-foreground">
-                      {formatLabel(item.action).toLowerCase()}
-                    </span>
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="min-w-0 text-xs leading-snug">
+                      <span className="font-semibold text-foreground">{actor}</span>{" "}
+                      <span className="text-muted-foreground">{actBadge.label.toLowerCase()}</span>{" "}
+                      <span className={cn("font-medium", modColor.text)}>{formatLabel(item.module)}</span>
+                    </p>
+                    <div className="flex shrink-0 flex-wrap items-center gap-1">
+                      {index === 0 ? (
+                        <span className="shrink-0 rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+                          New
+                        </span>
+                      ) : null}
+                      <span
+                        className={cn(
+                          "rounded-full border px-1.5 py-0.5 text-[9px] font-semibold",
+                          modColor.light,
+                          modColor.text,
+                          modColor.border,
+                        )}
+                      >
+                        {formatLabel(item.module)}
+                      </span>
+                    </div>
+                  </div>
                   <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">
                     {timeAgo(item.createdAt)}
                   </p>
@@ -94,11 +99,6 @@ export const ActivitySidebar = memo(function ActivitySidebar({
                     </Link>
                   ) : null}
                 </div>
-                {index === 0 ? (
-                  <span className="absolute -right-1 top-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
-                    New
-                  </span>
-                ) : null}
               </li>
             );
           })}
