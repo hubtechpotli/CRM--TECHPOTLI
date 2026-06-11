@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormField } from "@/components/ui/form-field";
 import {
   CustomerSearchField,
@@ -23,6 +23,10 @@ export function CustomerPickerField({
   placeholder?: string;
 }) {
   const [pinned, setPinned] = useState<CustomerOption | null>(null);
+
+  useEffect(() => {
+    if (!value) setPinned(null);
+  }, [value]);
 
   return (
     <FormField label={label + (required ? "" : " (optional)")}>

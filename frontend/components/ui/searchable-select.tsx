@@ -11,18 +11,16 @@ import {
 
 export type SearchableOption = { value: string; label: string; sublabel?: string };
 
-function resolveSelected(
+function resolveSelection(
   value: string,
   options: SearchableOption[],
+  picked: SearchableOption | null,
   selectedOption?: SearchableOption | null,
-  picked?: SearchableOption | null,
-) {
-  if (!value) return undefined;
-  return (
-    options.find((o) => o.value === value) ??
-    (selectedOption?.value === value ? selectedOption : undefined) ??
-    (picked?.value === value ? picked : undefined)
-  );
+): SearchableOption | undefined {
+  if (picked && (!value || picked.value === value)) return picked;
+  if (selectedOption && value && selectedOption.value === value) return selectedOption;
+  if (value) return options.find((o) => o.value === value);
+  return undefined;
 }
 
 export function SearchableSelect({
@@ -61,13 +59,17 @@ export function SearchableSelect({
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<SearchableOption | null>(null);
 
-  const selected = resolveSelected(value, options, selectedOption, picked);
+  const selected = resolveSelection(value, options, picked, selectedOption);
   const needsMoreChars =
     minSearchLength > 0 && query.trim().length > 0 && query.trim().length < minSearchLength;
   const showDropdown = open && !disabled;
 
   useEffect(() => {
-    if (!value) setPicked(null);
+    if (!value) {
+      const timer = window.setTimeout(() => setPicked(null), 200);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
   }, [value]);
 
   useEffect(() => {
@@ -82,6 +84,11 @@ export function SearchableSelect({
   }, []);
 
   function handleQuery(next: string) {
+    if (selected && next) {
+      setPicked(null);
+      onChange("");
+      onSearchChange?.("");
+    }
     setQuery(next);
     onSearchChange?.(next);
     if (!open) setOpen(true);
@@ -116,10 +123,11 @@ export function SearchableSelect({
     }
   }
 
-  const inputValue = selected && !open ? selected.label : query;
+  const isTyping = query.trim().length > 0;
+  const inputValue = isTyping ? query : selected?.label ?? query;
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div ref={rootRef} className={cn("relative space-y-2", className)}>
       <div
         className={cn(
           "flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 transition",
@@ -138,7 +146,10 @@ export function SearchableSelect({
           onChange={(e) => handleQuery(e.target.value)}
           onFocus={handleFocus}
           placeholder={placeholder}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          className={cn(
+            "min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+            selected && !isTyping && "font-medium text-foreground",
+          )}
           autoComplete="off"
         />
         {selected ? (
@@ -166,6 +177,12 @@ export function SearchableSelect({
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
         ) : null}
       </div>
+
+      {selected && !isTyping ? (
+        <p className="text-xs text-primary/90">
+          Selected: <span className="font-medium text-foreground">{selected.label}</span>
+        </p>
+      ) : null}
 
       <SearchDropdownPanel
         open={showDropdown}

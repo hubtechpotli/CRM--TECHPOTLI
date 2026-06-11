@@ -11,9 +11,20 @@ import {
   isInsideSearchPanel,
   SearchDropdownPanel,
   SearchOptionRow,
+  SelectedSearchValue,
 } from "@/components/ui/search-dropdown-panel";
 
 export type CustomerOption = { value: string; label: string; sublabel?: string };
+
+function resolveSelection(
+  value: string,
+  localPick: CustomerOption | null,
+  selectedOption?: CustomerOption | null,
+): CustomerOption | null {
+  if (localPick && (!value || localPick.value === value)) return localPick;
+  if (selectedOption && value && selectedOption.value === value) return selectedOption;
+  return null;
+}
 
 export function CustomerSearchField({
   value,
@@ -39,12 +50,10 @@ export function CustomerSearchField({
 
   const { data, isFetching, minChars } = useCustomerDirectorySearch(query, enabled);
 
-  const resolved =
-    selectedOption?.value === value
-      ? selectedOption
-      : localPick?.value === value
-        ? localPick
-        : null;
+  const resolved = useMemo(
+    () => resolveSelection(value, localPick, selectedOption),
+    [value, localPick, selectedOption],
+  );
 
   const options = useMemo(() => {
     const items = data?.items ?? [];
@@ -54,10 +63,14 @@ export function CustomerSearchField({
   const trimmed = query.trim();
   const isTyping = trimmed.length > 0;
   const needsMore = isTyping && trimmed.length < minChars;
-  const showDropdown = open && enabled && (isTyping || options.length > 0);
+  const showDropdown = open && enabled && !resolved && (isTyping || options.length > 0);
 
   useEffect(() => {
-    if (!value) setLocalPick(null);
+    if (!value) {
+      const timer = window.setTimeout(() => setLocalPick(null), 200);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
   }, [value]);
 
   useEffect(() => {
@@ -71,7 +84,8 @@ export function CustomerSearchField({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const inputValue = focused || isTyping ? query : (resolved?.label ?? query);
+  const editing = focused || isTyping;
+  const inputValue = editing ? query : resolved?.label ?? "";
 
   function handleInput(next: string) {
     if (resolved) {
@@ -99,12 +113,12 @@ export function CustomerSearchField({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative space-y-2">
       <div
         className={cn(
           "flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 transition",
           "focus-within:border-foreground/25 focus-within:ring-2 focus-within:ring-foreground/5",
-          resolved && "border-foreground/20 bg-muted/30",
+          resolved && "border-primary/30 bg-primary/[0.02]",
         )}
       >
         <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -115,18 +129,24 @@ export function CustomerSearchField({
           onChange={(e) => handleInput(e.target.value)}
           onFocus={() => {
             setFocused(true);
-            setOpen(true);
-            if (resolved) setQuery("");
+            if (resolved) {
+              setQuery("");
+            } else {
+              setOpen(true);
+            }
           }}
           onBlur={() => {
             window.setTimeout(() => setFocused(false), 120);
           }}
-          placeholder={resolved && !focused ? resolved.label : placeholder}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder={resolved && !editing ? resolved.label : placeholder}
+          className={cn(
+            "min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+            resolved && !editing && "font-medium text-foreground",
+          )}
           autoComplete="off"
           spellCheck={false}
         />
-        {resolved || query ? (
+        {(resolved || query) && enabled ? (
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
@@ -142,11 +162,19 @@ export function CustomerSearchField({
         ) : null}
       </div>
 
+      {resolved && !editing ? (
+        <SelectedSearchValue
+          label={resolved.label}
+          sublabel={resolved.sublabel}
+          onClear={enabled ? clearAll : undefined}
+        />
+      ) : null}
+
       <SearchDropdownPanel
         open={showDropdown}
         anchorRef={rootRef}
         kind="customer"
-        deps={[query, options.length, isFetching]}
+        deps={[query, options.length, isFetching, resolved?.value]}
         footer={
           !needsMore && options.length > 0
             ? `${options.length} result${options.length === 1 ? "" : "s"}`

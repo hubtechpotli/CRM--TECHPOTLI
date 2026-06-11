@@ -100,9 +100,12 @@ export function SearchOptionRow({
   return (
     <button
       type="button"
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSelect();
+      }}
       onMouseEnter={onMouseEnter}
-      onClick={onSelect}
       className={cn(
         "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition",
         highlighted ? "bg-primary/10" : "hover:bg-muted",
@@ -117,6 +120,46 @@ export function SearchOptionRow({
       </span>
       {selected ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
     </button>
+  );
+}
+
+export function SelectedSearchValue({
+  label,
+  sublabel,
+  onClear,
+  className,
+}: {
+  label: string;
+  sublabel?: string;
+  onClear?: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2",
+        className,
+      )}
+    >
+      <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{label}</p>
+        {sublabel ? (
+          <p className="truncate text-xs text-muted-foreground">{sublabel}</p>
+        ) : (
+          <p className="text-xs text-primary/80">Selected</p>
+        )}
+      </div>
+      {onClear ? (
+        <button
+          type="button"
+          onClick={onClear}
+          className="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          Change
+        </button>
+      ) : null}
+    </div>
   );
 }
 
