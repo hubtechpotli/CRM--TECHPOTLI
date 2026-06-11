@@ -19,12 +19,12 @@ import { IpAccessService } from '../common/services/ip-access.service';
 import { buildSessionClientUpdate } from '../common/utils/session-client.util';
 import { parseUserAgent } from '../common/utils/ip.util';
 import { v4 as uuidv4 } from 'uuid';
+import { parseDurationToSeconds } from '../common/utils/duration.util';
 
 const BCRYPT_ROUNDS = 12;
 const LOCKOUT_ATTEMPTS = 5;
 const LOCKOUT_TTL = 900;
 const TWO_FA_ATTEMPTS = 5;
-const REFRESH_TTL = 7 * 24 * 60 * 60;
 const REFRESH_GRACE_SECONDS = 30;
 
 type AuthUser = {
@@ -75,6 +75,10 @@ export class AuthService {
     private encryption: EncryptionService,
     private ipAccess: IpAccessService,
   ) {}
+
+  private refreshTtlSeconds(): number {
+    return parseDurationToSeconds(this.config.get<string>('JWT_REFRESH_EXPIRES'), 7 * 24 * 60 * 60);
+  }
 
   /** Every employee and admin must complete 2FA enrollment before accessing the CRM. */
   private mustEnroll2FA(role: string): boolean {
@@ -331,7 +335,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    await this.redis.set(`refresh:revoked:${lookup}`, session.userId, REFRESH_TTL);
+    await this.redis.set(`refresh:revoked:${lookup}`, session.userId, this.refreshTtlSeconds());
     await this.prisma.userSession.delete({ where: { id: session.id } });
     await this.sessions.revokeSession(session.id, session.userId);
 
@@ -351,14 +355,14 @@ export class AuthService {
         where: { id: sessionId, userId },
       });
       if (session) {
-        await this.redis.set(`refresh:revoked:${session.refreshTokenLookup}`, userId, REFRESH_TTL);
+        await this.redis.set(`refresh:revoked:${session.refreshTokenLookup}`, userId, this.refreshTtlSeconds());
       }
       await this.prisma.userSession.deleteMany({ where: { id: sessionId, userId } });
       await this.sessions.revokeSession(sessionId, userId);
     } else {
       const sessions = await this.prisma.userSession.findMany({ where: { userId } });
       for (const s of sessions) {
-        await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, userId, REFRESH_TTL);
+        await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, userId, this.refreshTtlSeconds());
       }
       await this.prisma.userSession.deleteMany({ where: { userId } });
       await this.sessions.revokeAllUserSessions(userId);
@@ -493,7 +497,7 @@ export class AuthService {
 
   private async revokeSessionRecord(sessionId: string, userId: string, lookup?: string) {
     if (lookup) {
-      await this.redis.set(`refresh:revoked:${lookup}`, userId, REFRESH_TTL);
+      await this.redis.set(`refresh:revoked:${lookup}`, userId, this.refreshTtlSeconds());
     }
     await this.prisma.userSession.deleteMany({ where: { id: sessionId, userId } });
     await this.sessions.revokeSession(sessionId, userId);
@@ -502,7 +506,7 @@ export class AuthService {
   private async revokeAllSessionsForUser(userId: string) {
     const sessions = await this.prisma.userSession.findMany({ where: { userId } });
     for (const s of sessions) {
-      await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, userId, REFRESH_TTL);
+      await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, userId, this.refreshTtlSeconds());
     }
     await this.prisma.userSession.deleteMany({ where: { userId } });
     await this.sessions.revokeAllUserSessions(userId);
@@ -513,7 +517,7 @@ export class AuthService {
     const refreshHash = await bcrypt.hash(refreshToken, 10);
     const refreshTokenLookup = this.refreshLookup(refreshToken);
     const { device, browser } = parseUserAgent(userAgent);
-    const expiresAt = new Date(Date.now() + REFRESH_TTL * 1000);
+    const expiresAt = new Date(Date.now() + this.refreshTtlSeconds() * 1000);
 
     const session = await this.prisma.userSession.create({
       data: {

@@ -5,10 +5,10 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import { SessionService } from '../redis/session.service';
-
-const REFRESH_TTL = 7 * 24 * 60 * 60;
+import { parseDurationToSeconds } from '../common/utils/duration.util';
 
 const userSelect = {
   id: true,
@@ -30,7 +30,12 @@ export class UsersService {
     private prisma: PrismaService,
     private redis: RedisService,
     private sessions: SessionService,
+    private config: ConfigService,
   ) {}
+
+  private refreshTtlSeconds(): number {
+    return parseDurationToSeconds(this.config.get<string>('JWT_REFRESH_EXPIRES'), 7 * 24 * 60 * 60);
+  }
 
   findAssignees() {
     return this.prisma.user.findMany({
@@ -124,7 +129,7 @@ export class UsersService {
 
     const sessions = await this.prisma.userSession.findMany({ where: { userId: targetId } });
     for (const s of sessions) {
-      await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, targetId, REFRESH_TTL);
+      await this.redis.set(`refresh:revoked:${s.refreshTokenLookup}`, targetId, this.refreshTtlSeconds());
     }
     await this.prisma.userSession.deleteMany({ where: { userId: targetId } });
     await this.sessions.revokeAllUserSessions(targetId);

@@ -6,6 +6,7 @@ import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { removeListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { formatDate, formatLabel } from "@/lib/format";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -31,7 +32,7 @@ export default function ApprovalsPage() {
       const res = await api.get<ApprovalRow[]>("/approvals/pending");
       return res.data;
     },
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const actionMutation = useOptimisticMutation({

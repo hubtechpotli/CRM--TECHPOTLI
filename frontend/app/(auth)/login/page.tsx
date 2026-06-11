@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { motion } from "framer-motion";
@@ -27,8 +27,10 @@ type LoginResponse = {
 const inputClass =
   "w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/60 focus:border-foreground/25 focus:ring-2 focus:ring-foreground/5";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const passwordChanged = searchParams.get("reason") === "password-changed";
   const queryClient = useQueryClient();
   const setAuth = useAuthStore((s) => s.setAuth);
   const setPending2FA = useAuthStore((s) => s.setPending2FA);
@@ -132,6 +134,11 @@ export default function LoginPage() {
         >
           Sign in to access your workspace dashboard
         </motion.p>
+        {passwordChanged ? (
+          <p className="mt-3 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">
+            Password updated. Sign in again with your new password.
+          </p>
+        ) : null}
       </div>
 
       <form onSubmit={onSubmit} className="space-y-5">
@@ -242,5 +249,21 @@ export default function LoginPage() {
         <span>Protected by TechPotli security · 2FA required</span>
       </motion.div>
     </AuthCardShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthCardShell>
+          <div className="flex min-h-[280px] items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </AuthCardShell>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

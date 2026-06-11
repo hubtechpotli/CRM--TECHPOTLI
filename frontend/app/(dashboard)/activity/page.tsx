@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ListPageSkeleton } from "@/components/ui/skeleton";
 import { FormField, SelectInput } from "@/components/ui/form-field";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { useRouteColor } from "@/hooks/use-route-color";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ export default function ActivityPage() {
       const res = await api.get<ActivityResponse>(`/activity-log?${params}`);
       return res.data;
     },
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const items = data?.items ?? [];

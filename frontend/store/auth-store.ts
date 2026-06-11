@@ -51,15 +51,10 @@ function clearSessionToken() {
   localStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
-function readSessionToken(): string | null {
+/** Read stored token without clearing on expiry — refresh cookie may still be valid. */
+function readStoredSessionToken(): string | null {
   if (typeof window === "undefined") return null;
-  const token = localStorage.getItem(SESSION_TOKEN_KEY);
-  if (!token) return null;
-  if (isJwtExpired(token)) {
-    clearSessionToken();
-    return null;
-  }
-  return token;
+  return localStorage.getItem(SESSION_TOKEN_KEY);
 }
 
 function pickLiveToken(currentToken: string | null, storedToken: string | null): string | null {
@@ -105,21 +100,30 @@ export const useAuthStore = create<AuthState>()(
         });
       },
       restoreSessionToken: () => {
-        const token = pickLiveToken(get().accessToken, readSessionToken());
+        const stored = readStoredSessionToken();
+        const live = pickLiveToken(get().accessToken, stored);
+        const token = live ?? stored ?? get().accessToken;
         if (token && token !== get().accessToken) {
           set({ accessToken: token });
         }
         return token;
       },
       hasValidSession: () => {
-        const token = pickLiveToken(get().accessToken, readSessionToken());
-        return !!token;
+        const live = pickLiveToken(get().accessToken, readStoredSessionToken());
+        if (live) return true;
+        // Persisted user + httpOnly refresh cookie may still be valid after access JWT expires.
+        return !!get().user;
       },
       isInAuthGracePeriod: () => {
         const at = get().authenticatedAt;
         return !!at && Date.now() - at < AUTH_GRACE_MS;
       },
       logout: () => {
+        if (typeof window !== "undefined") {
+          void import("@/lib/session-sync").then(({ broadcastSessionEvent }) => {
+            broadcastSessionEvent({ type: "logout" });
+          });
+        }
         clearSessionToken();
         set({
           user: null,
@@ -146,7 +150,7 @@ export const useAuthStore = create<AuthState>()(
       }),
       merge: (persistedState, currentState) => {
         const persisted = (persistedState ?? {}) as Partial<AuthState>;
-        const storedToken = readSessionToken();
+        const storedToken = readStoredSessionToken();
         const liveToken = pickLiveToken(currentState.accessToken, storedToken);
         const hasLiveSession = !!liveToken;
 
@@ -168,7 +172,7 @@ export const useAuthStore = create<AuthState>()(
         return {
           ...currentState,
           ...persisted,
-          accessToken: liveToken,
+          accessToken: storedToken ?? liveToken,
         };
       },
     },

@@ -7,6 +7,8 @@ import {
   customerToOption,
   useCustomerDirectorySearch,
 } from "@/hooks/use-customer-directory-search";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { isAxiosError } from "axios";
 import {
   isInsideSearchPanel,
   SearchDropdownPanel,
@@ -49,7 +51,15 @@ export function CustomerSearchField({
   const [focused, setFocused] = useState(false);
   const [localPick, setLocalPick] = useState<CustomerOption | null>(null);
 
-  const { data, isFetching, minChars } = useCustomerDirectorySearch(query, enabled);
+  const { data, isFetching, minChars, isError, error: searchError } = useCustomerDirectorySearch(query, enabled);
+
+  const errorMessage = useMemo(() => {
+    if (!isError || !searchError) return null;
+    if (isAxiosError(searchError) && searchError.response?.status === 401) {
+      return "Session expired — please refresh the page or sign in again";
+    }
+    return getApiErrorMessage(searchError, "Could not load customers — try again");
+  }, [isError, searchError]);
 
   const resolved = useMemo(
     () => resolveSelection(value, localPick, selectedOption),
@@ -64,7 +74,8 @@ export function CustomerSearchField({
   const trimmed = query.trim();
   const isTyping = trimmed.length > 0;
   const needsMore = isTyping && trimmed.length < minChars;
-  const showDropdown = open && enabled && !resolved && (isTyping || options.length > 0);
+  const showDropdown =
+    open && enabled && !resolved && (isTyping || options.length > 0 || !!errorMessage);
 
   useEffect(() => {
     if (prevValueRef.current && !value) {
@@ -186,6 +197,8 @@ export function CustomerSearchField({
             <li className="px-3 py-3 text-xs text-muted-foreground">
               Type at least {minChars} characters to search
             </li>
+          ) : errorMessage ? (
+            <li className="px-3 py-3 text-xs text-red-600 dark:text-red-400">{errorMessage}</li>
           ) : options.length === 0 ? (
             <li className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
               {isFetching ? (

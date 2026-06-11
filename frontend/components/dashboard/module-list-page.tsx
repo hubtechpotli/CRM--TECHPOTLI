@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteColor } from "@/lib/nav-colors";
 import { api } from "@/lib/api";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { DataColumn, DataTable } from "@/components/dashboard/data-table";
@@ -54,7 +55,7 @@ export function ModuleListPage<T extends Record<string, unknown>>({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [queryKey, params, paginated ? page : null],
     enabled,
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
     queryFn: async () => {
       const res = await api.get<T[] | PaginatedResponse<T>>(endpoint, {
         params: paginated ? { ...params, page, limit } : params,

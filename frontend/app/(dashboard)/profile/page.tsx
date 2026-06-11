@@ -110,12 +110,6 @@ export default function ProfilePage() {
     saveMutation.mutate(trimmed);
   }
 
-  function handlePasswordSuccess() {
-    if (user && accessToken) {
-      setAuth({ ...user, mustChangePassword: false }, accessToken, sessionId, 14 * 60_000);
-    }
-  }
-
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Profile" description="Manage your account name and password." />
@@ -218,7 +212,7 @@ export default function ProfilePage() {
 
           <GlassCard>
             <h2 className="mb-4 text-sm font-semibold">Change password</h2>
-            <ChangePasswordForm onSuccess={handlePasswordSuccess} />
+            <ChangePasswordForm />
           </GlassCard>
         </>
       )}

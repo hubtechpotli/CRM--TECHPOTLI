@@ -4,9 +4,18 @@ import { isAdmin } from "@/lib/roles";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
   CUSTOMERS_DIRECTORY_STALE_MS,
+  LIST_STALE_MS,
   REPORTS_STALE_MS,
   TEAM_FEED_STALE_MS,
 } from "@/lib/query-stale";
+
+const customerDirectoryParams = {
+  q: undefined,
+  status: undefined,
+  assignedEmployeeId: undefined,
+  page: 1,
+  limit: DEFAULT_PAGE_SIZE,
+};
 
 export async function prefetchAfterAuth(
   queryClient: QueryClient,
@@ -24,12 +33,22 @@ export async function prefetchAfterAuth(
       staleTime: REPORTS_STALE_MS,
     }),
     queryClient.prefetchQuery({
-      queryKey: ["customers-directory", { page: 1, limit: DEFAULT_PAGE_SIZE }],
+      queryKey: ["customers-directory", customerDirectoryParams],
       queryFn: async () =>
         import("@/lib/customers-directory").then((m) =>
-          m.fetchCustomersDirectory({ page: 1, limit: DEFAULT_PAGE_SIZE }),
+          m.fetchCustomersDirectory(customerDirectoryParams),
         ),
       staleTime: CUSTOMERS_DIRECTORY_STALE_MS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["team-updates-summary"],
+      queryFn: async () => (await api.get("/team-updates/summary")).data,
+      staleTime: TEAM_FEED_STALE_MS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["leads-kanban"],
+      queryFn: async () => (await api.get("/leads/kanban")).data,
+      staleTime: LIST_STALE_MS,
     }),
   ];
 
@@ -42,14 +61,6 @@ export async function prefetchAfterAuth(
       }),
     );
   }
-
-  tasks.push(
-    queryClient.prefetchQuery({
-      queryKey: ["team-updates-summary"],
-      queryFn: async () => (await api.get("/team-updates/summary")).data,
-      staleTime: TEAM_FEED_STALE_MS,
-    }),
-  );
 
   await Promise.allSettled(tasks);
 }

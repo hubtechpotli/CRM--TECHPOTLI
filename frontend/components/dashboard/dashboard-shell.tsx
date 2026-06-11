@@ -143,7 +143,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }
     if (href === "/projects") {
       queryClient.prefetchQuery({
-        queryKey: ["projects", 1],
+        queryKey: ["projects", "", 1, DEFAULT_PAGE_SIZE],
         queryFn: async () =>
           (await api.get("/projects", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
         staleTime: LIST_STALE_MS,

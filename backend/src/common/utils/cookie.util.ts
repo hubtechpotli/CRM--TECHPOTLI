@@ -1,7 +1,11 @@
 import { Response } from 'express';
+import { getRefreshTtlSeconds } from './duration.util';
 
 const REFRESH_COOKIE = 'refreshToken';
-const REFRESH_MAX_AGE = 7 * 24 * 60 * 60;
+
+function refreshMaxAgeSeconds(): number {
+  return getRefreshTtlSeconds();
+}
 /** Root path so the refresh cookie is sent reliably via Next.js /api proxy and direct API calls. */
 const COOKIE_PATH = '/';
 
@@ -63,7 +67,7 @@ function buildCookieParts(token: string, maxAge: number): string[] {
 }
 
 export function setRefreshCookie(res: Response, token: string) {
-  res.setHeader('Set-Cookie', buildCookieParts(token, REFRESH_MAX_AGE).join('; '));
+  res.setHeader('Set-Cookie', buildCookieParts(token, refreshMaxAgeSeconds()).join('; '));
 }
 
 export function clearRefreshCookie(res: Response) {

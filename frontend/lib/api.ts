@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
-import { isJwtExpired } from "@/lib/jwt";
+import { withCrossTabRefreshLock } from "@/lib/session-sync";
 
 function apiOriginFromEnv(envUrl: string): string | null {
   const trimmed = envUrl.replace(/\/$/, "");
@@ -88,61 +88,63 @@ function shouldForceLogout(error: AxiosError): boolean {
 }
 
 function shouldForceLogoutOnRefresh(error: AxiosError): boolean {
-  if (error.response?.status === 401) return true;
+  const status = error.response?.status;
+  if (status === 429) return false;
+  if (!error.response) return false;
+  if (status === 401) return true;
   return shouldForceLogout(error);
 }
 
-function hasValidAccessToken(): boolean {
-  const store = useAuthStore.getState();
-  const token = store.restoreSessionToken();
-  return !!token && !isJwtExpired(token);
+function isTransientRefreshError(error: AxiosError): boolean {
+  return !error.response || error.response.status === 429;
 }
 
 function redirectToLogin() {
-  if (hasValidAccessToken()) return;
   useAuthStore.getState().logout();
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
     window.location.href = "/login";
   }
 }
 
+async function performRefresh(): Promise<string | null> {
+  try {
+    const res = await api.post<{
+      accessToken?: string;
+      sessionId?: string;
+      user?: { id: string; email: string; name?: string; role: string; mustChangePassword?: boolean };
+    }>("/auth/refresh");
+    const { accessToken, sessionId, user } = res.data;
+    if (accessToken) {
+      const store = useAuthStore.getState();
+      store.setAccessToken(accessToken, sessionId ?? null);
+      if (user) {
+        store.setAuth(
+          {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            mustChangePassword: user.mustChangePassword,
+          },
+          accessToken,
+          sessionId ?? null,
+        );
+      }
+      return accessToken;
+    }
+    return null;
+  } catch (error) {
+    if (isTransientRefreshError(error as AxiosError)) throw error;
+    if ((error as AxiosError).response?.status === 401) return null;
+    return null;
+  }
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
-    refreshPromise = api
-      .post<{
-        accessToken?: string;
-        sessionId?: string;
-        user?: { id: string; email: string; name?: string; role: string; mustChangePassword?: boolean };
-      }>("/auth/refresh")
-      .then((res) => {
-        const { accessToken, sessionId, user } = res.data;
-        if (accessToken) {
-          const store = useAuthStore.getState();
-          store.setAccessToken(accessToken, sessionId ?? null);
-          if (user) {
-            store.setAuth(
-              {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                mustChangePassword: user.mustChangePassword,
-              },
-              accessToken,
-              sessionId ?? null,
-            );
-          }
-          return accessToken;
-        }
-        return null;
-      })
-      .catch((error: AxiosError) => {
-        if (!error.response) throw error;
-        return null;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
+    refreshPromise = withCrossTabRefreshLock(performRefresh).finally(() => {
+      refreshPromise = null;
+    });
   }
   return refreshPromise;
 }
@@ -153,9 +155,7 @@ api.interceptors.response.use(
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (original?.url?.includes("/auth/refresh") && shouldForceLogoutOnRefresh(error)) {
-      if (!hasValidAccessToken()) {
-        redirectToLogin();
-      }
+      redirectToLogin();
       return Promise.reject(error);
     }
 

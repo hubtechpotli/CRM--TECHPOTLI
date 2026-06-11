@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { removeListItem } from "@/lib/optimistic-mutation";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { isAxiosError } from "axios";
 import {
   AlertTriangle,
@@ -135,7 +136,7 @@ export default function LeadsPage() {
       const res = await api.get<Record<string, LeadRow[]>>("/leads/kanban");
       return res.data;
     },
-    staleTime: 60_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const stats = useMemo(() => computeKanbanStats(kanbanData), [kanbanData]);
@@ -154,7 +155,7 @@ export default function LeadsPage() {
       });
       return res.data;
     },
-    staleTime: 60_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const rows = leadsData?.items ?? [];

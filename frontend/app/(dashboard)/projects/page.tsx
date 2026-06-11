@@ -30,6 +30,7 @@ import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { useRouteColor } from "@/hooks/use-route-color";
 import { isTempId } from "@/lib/optimistic-mutation";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 
 type ProjectRow = Record<string, unknown> & {
   customer?: { companyName?: string };
@@ -74,6 +75,7 @@ export default function ProjectsPage() {
       });
       return normalizePaginated<ProjectRow>(res.data);
     },
+    staleTime: LIST_STALE_MS,
   });
 
   const rows = data?.data ?? [];

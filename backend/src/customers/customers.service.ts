@@ -85,6 +85,117 @@ export class CustomersService {
     }));
   }
 
+  private buildDirectoryWhere(
+    filters?: { status?: CustomerStatus; state?: string; assignedEmployeeId?: string },
+    searchTerm?: string,
+  ): Prisma.CustomerWhereInput {
+    const where: Prisma.CustomerWhereInput = {};
+    if (filters?.status) where.status = filters.status;
+    if (filters?.state) where.state = filters.state;
+    if (filters?.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
+    if (searchTerm) {
+      where.OR = [
+        { companyName: { contains: searchTerm, mode: 'insensitive' } },
+        { ownerName: { contains: searchTerm, mode: 'insensitive' } },
+        { phone: { contains: searchTerm } },
+        { email: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+    return where;
+  }
+
+  private async queryDirectoryByIlike(
+    filters: { status?: CustomerStatus; state?: string; assignedEmployeeId?: string } | undefined,
+    searchTerm: string | undefined,
+    safePage: number,
+    safeLimit: number,
+  ) {
+    const where = this.buildDirectoryWhere(filters, searchTerm);
+    const [rows, total] = await Promise.all([
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+        include: {
+          assignedEmployee: { select: { id: true, name: true } },
+          summary: true,
+        },
+      }),
+      this.prisma.customer.count({ where }),
+    ]);
+    return {
+      items: this.mapDirectoryRows(rows),
+      total,
+      page: safePage,
+      limit: safeLimit,
+    };
+  }
+
+  private async queryDirectoryByFts(
+    filters: { status?: CustomerStatus; state?: string; assignedEmployeeId?: string } | undefined,
+    searchTerm: string,
+    safePage: number,
+    safeLimit: number,
+  ) {
+    const { ids, total } = await this.searchIndex.searchCustomerDirectory(
+      searchTerm,
+      {
+        status: filters?.status,
+        state: filters?.state,
+        assignedEmployeeId: filters?.assignedEmployeeId,
+      },
+      safePage,
+      safeLimit,
+    );
+    if (!ids.length) return null;
+    const rows = await this.prisma.customer.findMany({
+      where: { id: { in: ids } },
+      include: {
+        assignedEmployee: { select: { id: true, name: true } },
+        summary: true,
+      },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const ordered = ids.map((id) => byId.get(id)).filter((row): row is NonNullable<typeof row> => !!row);
+    return {
+      items: this.mapDirectoryRows(ordered),
+      total,
+      page: safePage,
+      limit: safeLimit,
+    };
+  }
+
+  private async resolveDirectory(
+    filters: { status?: CustomerStatus; state?: string; q?: string; assignedEmployeeId?: string } | undefined,
+    safePage: number,
+    safeLimit: number,
+  ) {
+    const searchTerm = filters?.q?.trim();
+    if (!searchTerm) {
+      return this.queryDirectoryByIlike(filters, undefined, safePage, safeLimit);
+    }
+
+    // Partial names (edu → Education) need ILIKE; FTS only matches full word tokens.
+    if (searchTerm.length <= 4) {
+      return this.queryDirectoryByIlike(filters, searchTerm, safePage, safeLimit);
+    }
+
+    try {
+      const indexCount = await this.prisma.searchIndex.count({ where: { entityType: 'CUSTOMER' } });
+      if (indexCount > 0) {
+        const ftsResult = await this.queryDirectoryByFts(filters, searchTerm, safePage, safeLimit);
+        if (ftsResult && ftsResult.items.length > 0) {
+          return ftsResult;
+        }
+      }
+    } catch {
+      /* fall through to ILIKE */
+    }
+
+    return this.queryDirectoryByIlike(filters, searchTerm, safePage, safeLimit);
+  }
+
   async directory(
     filters?: { status?: CustomerStatus; state?: string; q?: string; assignedEmployeeId?: string },
     page = 1,
@@ -95,81 +206,16 @@ export class CustomersService {
     const ns = await this.cache.namespaceVersion('customers-directory');
     const cacheKey = `customers:directory:${ns}:${JSON.stringify(filters ?? {})}:${safePage}:${safeLimit}`;
     const cacheTtl = filters?.q?.trim() ? 120 : 180;
+    const hasSearch = Boolean(filters?.q?.trim());
 
-    return this.cache.wrap(cacheKey, cacheTtl, async () => {
-      const searchTerm = filters?.q?.trim();
-      if (searchTerm) {
-        try {
-          const indexCount = await this.prisma.searchIndex.count({ where: { entityType: 'CUSTOMER' } });
-          if (indexCount > 0) {
-            const { ids, total } = await this.searchIndex.searchCustomerDirectory(
-              searchTerm,
-              {
-                status: filters?.status,
-                state: filters?.state,
-                assignedEmployeeId: filters?.assignedEmployeeId,
-              },
-              safePage,
-              safeLimit,
-            );
-            if (!ids.length) {
-              return { items: [], total, page: safePage, limit: safeLimit };
-            }
-            const rows = await this.prisma.customer.findMany({
-              where: { id: { in: ids } },
-              include: {
-                assignedEmployee: { select: { id: true, name: true } },
-                summary: true,
-              },
-            });
-            const byId = new Map(rows.map((row) => [row.id, row]));
-            const ordered = ids.map((id) => byId.get(id)).filter((row): row is NonNullable<typeof row> => !!row);
-            return {
-              items: this.mapDirectoryRows(ordered),
-              total,
-              page: safePage,
-              limit: safeLimit,
-            };
-          }
-        } catch {
-          /* fall through to ILIKE */
-        }
-      }
-
-      const where: Prisma.CustomerWhereInput = {};
-      if (filters?.status) where.status = filters.status;
-      if (filters?.state) where.state = filters.state;
-      if (filters?.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
-      if (searchTerm) {
-        where.OR = [
-          { companyName: { contains: searchTerm, mode: 'insensitive' } },
-          { ownerName: { contains: searchTerm, mode: 'insensitive' } },
-          { phone: { contains: searchTerm } },
-          { email: { contains: searchTerm, mode: 'insensitive' } },
-        ];
-      }
-
-      const [rows, total] = await Promise.all([
-        this.prisma.customer.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: (safePage - 1) * safeLimit,
-          take: safeLimit,
-          include: {
-            assignedEmployee: { select: { id: true, name: true } },
-            summary: true,
-          },
-        }),
-        this.prisma.customer.count({ where }),
-      ]);
-
-      return {
-        items: this.mapDirectoryRows(rows),
-        total,
-        page: safePage,
-        limit: safeLimit,
-      };
-    });
+    return this.cache.wrap(
+      cacheKey,
+      cacheTtl,
+      () => this.resolveDirectory(filters, safePage, safeLimit),
+      {
+        skipCache: (result) => hasSearch && Array.isArray(result.items) && result.items.length === 0,
+      },
+    );
   }
 
   async findOne(id: string) {

@@ -12,5 +12,5 @@ export const TEAM_FEED_STALE_MS = 120_000;
 /** Standard list pages (invoices, payments, leads list) — 30s */
 export const LIST_STALE_MS = 30_000;
 
-/** Global / typeahead search — 60s */
-export const SEARCH_STALE_MS = 60_000;
+/** Global / typeahead search — 120s (matches backend search Redis TTL) */
+export const SEARCH_STALE_MS = 120_000;

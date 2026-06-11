@@ -3,20 +3,19 @@
 import { FormEvent, useState } from "react";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { logoutAllSessionsAndRedirect } from "@/lib/session-sync";
 import { FormField } from "@/components/ui/form-field";
 import { PasswordInput } from "@/components/ui/password-input";
 
 const PASSWORD_HINT = "Min 8 chars with uppercase, number, and special character";
 
 type ChangePasswordFormProps = {
-  onSuccess?: () => void;
   submitLabel?: string;
   showCancel?: boolean;
   onCancel?: () => void;
 };
 
 export function ChangePasswordForm({
-  onSuccess,
   submitLabel = "Update password",
   showCancel,
   onCancel,
@@ -26,7 +25,6 @@ export function ChangePasswordForm({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,20 +34,14 @@ export function ChangePasswordForm({
     }
     setLoading(true);
     setError(null);
-    setSuccess(null);
     try {
       await api.post("/auth/change-password", { currentPassword, newPassword });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setSuccess("Password updated successfully.");
-      onSuccess?.();
+      await logoutAllSessionsAndRedirect("password-changed");
     } catch (err) {
       const message = isAxiosError(err)
         ? (err.response?.data as { message?: string | string[] })?.message ?? err.message
         : "Failed to change password";
       setError(Array.isArray(message) ? message.join(", ") : String(message));
-    } finally {
       setLoading(false);
     }
   }
@@ -58,9 +50,6 @@ export function ChangePasswordForm({
     <form onSubmit={onSubmit} className="space-y-4">
       {error ? (
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
-      ) : null}
-      {success ? (
-        <p className="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{success}</p>
       ) : null}
       <FormField label="Current password">
         <PasswordInput

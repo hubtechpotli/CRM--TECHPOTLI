@@ -15,6 +15,7 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import type { TeamUpdatesSummary } from "@/lib/team-updates";
 import { TeamUpdatesFeed } from "@/components/team-updates/team-updates-feed";
 import { FEATURE } from "@/lib/feature-colors";
+import { TEAM_FEED_STALE_MS } from "@/lib/query-stale";
 import { cn } from "@/lib/utils";
 
 type StatKey = "open" | "mine" | "unassigned" | "today";
@@ -71,8 +72,8 @@ export default function TeamUpdatesPage() {
       return res.data;
     },
     enabled: authReady,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: TEAM_FEED_STALE_MS,
+    staleTime: TEAM_FEED_STALE_MS,
   });
 
   function applyStat(stat: (typeof STAT_CARDS)[number]) {

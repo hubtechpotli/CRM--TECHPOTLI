@@ -2,6 +2,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchCustomersDirectory } from "@/lib/customers-directory";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { CUSTOMERS_DIRECTORY_STALE_MS } from "@/lib/query-stale";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
 export type CustomerSearchRow = {
   id: string;
@@ -11,7 +12,7 @@ export type CustomerSearchRow = {
   ownerName?: string;
 };
 
-const SEARCH_LIMIT = 50;
+const SEARCH_LIMIT = DEFAULT_PAGE_SIZE;
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 250;
 
@@ -42,6 +43,7 @@ export function useCustomerDirectorySearch(query: string, enabled = true) {
     minChars: MIN_CHARS,
     needsMoreChars: enabled && term.length > 0 && term.length < MIN_CHARS,
     isSearchReady: canFetch,
+    searchError: result.isError ? result.error : null,
   };
 }
 

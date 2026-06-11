@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -36,7 +37,7 @@ export default function RenewalsPage() {
       const res = await api.get("/renewals", { params: { page, limit: pageSize } });
       return normalizePaginated<RenewalRow>(res.data);
     },
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const rows = data?.data ?? [];

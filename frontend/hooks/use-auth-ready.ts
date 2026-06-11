@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth-store";
-import { isJwtExpired } from "@/lib/jwt";
 
 export function useAuthReady() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const restoreSessionToken = useAuthStore((s) => s.restoreSessionToken);
+  const hasValidSession = useAuthStore((s) => s.hasValidSession);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export function useAuthReady() {
   }, []);
 
   const token = hydrated ? restoreSessionToken() : null;
-  const authReady = hydrated && !!token && !isJwtExpired(token);
+  const authReady = hydrated && hasValidSession();
 
   return { authReady, accessToken: token, hydrated };
 }

@@ -111,8 +111,14 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @SkipPasswordChange()
   @Post('change-password')
-  changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto) {
-    return this.auth.changePassword(user.sub, dto.currentPassword, dto.newPassword);
+  async changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.auth.changePassword(user.sub, dto.currentPassword, dto.newPassword);
+    clearRefreshCookie(res);
+    return { success: true, requiresReLogin: true };
   }
 
   @UseGuards(AuthGuard('jwt'))

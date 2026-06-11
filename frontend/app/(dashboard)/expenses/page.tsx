@@ -6,6 +6,7 @@ import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { patchListItem } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
@@ -39,7 +40,7 @@ export default function ExpensesPage() {
       return res.data;
     },
     enabled: authReady,
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const approveMutation = useOptimisticMutation({

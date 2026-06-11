@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { refreshAccessToken } from "@/lib/api";
 import { isJwtExpired } from "@/lib/jwt";
 import { useSessionRefresh } from "@/hooks/use-session-refresh";
+import { useSessionSync } from "@/hooks/use-session-sync";
 import { prefetchAfterAuth } from "@/lib/prefetch-after-auth";
 import { AppShellSkeleton } from "@/components/ui/skeleton";
 
@@ -29,6 +30,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const prefetchedRef = useRef(false);
 
   useSessionRefresh();
+  useSessionSync();
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -64,11 +66,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         if (status === 401 || status === 403) {
           refreshFailedAuth = true;
         }
+        // 429 / network errors: keep session, user can retry
       }
 
       if (cancelled) return;
 
-      if (refreshFailedAuth && !restoreSessionToken() && useAuthStore.getState().user) {
+      if (refreshFailedAuth) {
         logout();
       }
 
@@ -83,8 +86,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (bootstrapping) return;
 
-    const token = restoreSessionToken();
-    const sessionValid = !!token && !isJwtExpired(token);
+    const sessionValid = hasValidSession();
 
     if (sessionValid && pending2FA) {
       setPending2FA(false, null);
@@ -117,6 +119,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     pathname,
     router,
     restoreSessionToken,
+    hasValidSession,
     setPending2FA,
     setPending2FASetup,
   ]);

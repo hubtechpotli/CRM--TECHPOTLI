@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { RedisService } from './redis.service';
+import { parseDurationToSeconds } from '../common/utils/duration.util';
 
 const SESSION_PREFIX = 'session:';
 const SESSION_CTX_PREFIX = 'session:ctx:';
 const USER_PERMISSIONS_PREFIX = 'user_permissions:';
-const SESSION_TTL = 7 * 24 * 60 * 60;
 const SESSION_CTX_TTL = 14 * 60;
 const USER_PERMISSIONS_TTL = 5 * 60;
 
@@ -18,11 +19,19 @@ export type UserPermissionsCache = {
 
 @Injectable()
 export class SessionService {
-  constructor(private redis: RedisService) {}
+  constructor(
+    private redis: RedisService,
+    private config: ConfigService,
+  ) {}
+
+  private sessionTtlSeconds(): number {
+    return parseDurationToSeconds(this.config.get<string>('JWT_REFRESH_EXPIRES'), 7 * 24 * 60 * 60);
+  }
 
   async registerSession(sessionId: string, userId: string): Promise<void> {
-    await this.redis.set(`${SESSION_PREFIX}${sessionId}`, userId, SESSION_TTL);
-    await this.redis.set(`${SESSION_PREFIX}user:${userId}:${sessionId}`, '1', SESSION_TTL);
+    const ttl = this.sessionTtlSeconds();
+    await this.redis.set(`${SESSION_PREFIX}${sessionId}`, userId, ttl);
+    await this.redis.set(`${SESSION_PREFIX}user:${userId}:${sessionId}`, '1', ttl);
   }
 
   async getRaw(key: string): Promise<string | null> {

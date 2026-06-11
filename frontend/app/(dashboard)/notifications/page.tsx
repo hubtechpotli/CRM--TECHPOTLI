@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
 import { timeAgo } from "@/lib/format";
@@ -40,7 +41,7 @@ export default function NotificationsPage() {
       return normalizePaginated<Notification>(res.data);
     },
     enabled: authReady,
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const notifications = data?.data ?? [];

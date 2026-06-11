@@ -11,7 +11,7 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import { KpiSparklineCard } from "@/components/dashboard/kpi-sparkline-card";
 import { DashboardHeroBanner } from "@/components/dashboard/dashboard-hero-banner";
 import { TeamUpdatesPanel } from "@/components/dashboard/team-updates-panel";
-import { REPORTS_STALE_MS } from "@/lib/query-stale";
+import { LIST_STALE_MS, REPORTS_STALE_MS } from "@/lib/query-stale";
 
 const LeadsOverviewChart = dynamic(
   () => import("@/components/dashboard/leads-overview-chart").then((m) => m.LeadsOverviewChart),
@@ -114,7 +114,7 @@ export default function DashboardPage() {
       return res.data;
     },
     enabled: authReady,
-    staleTime: REPORTS_STALE_MS,
+    staleTime: LIST_STALE_MS,
   });
 
   const { data: collectionsSummary, isLoading: collectionsLoading } = useQuery({

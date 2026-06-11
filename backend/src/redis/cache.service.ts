@@ -37,7 +37,12 @@ export class CacheService {
     await this.redis.del(this.key(key));
   }
 
-  async wrap<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
+  async wrap<T>(
+    key: string,
+    ttlSeconds: number,
+    fn: () => Promise<T>,
+    options?: { skipCache?: (result: T) => boolean },
+  ): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== null) {
       this.timingMetrics.redisCacheHits.inc();
@@ -45,7 +50,9 @@ export class CacheService {
     }
     this.timingMetrics.redisCacheMisses.inc();
     const result = await fn();
-    await this.set(key, result, ttlSeconds);
+    if (!options?.skipCache?.(result)) {
+      await this.set(key, result, ttlSeconds);
+    }
     return result;
   }
 

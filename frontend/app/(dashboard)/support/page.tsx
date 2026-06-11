@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import { formatDate, formatLabel } from "@/lib/format";
 import { isTempId } from "@/lib/optimistic-mutation";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import { CrmPageShell } from "@/components/dashboard/crm-page-shell";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { DataTable } from "@/components/dashboard/data-table";
@@ -33,7 +34,7 @@ export default function SupportPage() {
       return res.data;
     },
     enabled: authReady,
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const rows = Array.isArray(data) ? data : [];

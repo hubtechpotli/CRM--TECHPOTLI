@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { moveKanbanCard } from "@/lib/optimistic-mutation";
 import { formatDate } from "@/lib/format";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 import {
   DndContext,
   DragEndEvent,
@@ -202,7 +203,7 @@ export function LeadKanban({ showSalesPerson = false }: { showSalesPerson?: bool
       const res = await api.get<Record<string, Lead[]>>("/leads/kanban");
       return res.data;
     },
-    staleTime: 60_000,
+    staleTime: LIST_STALE_MS,
   });
 
   const statusMutation = useOptimisticMutation({
