@@ -23,6 +23,7 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import { isAdmin, isSuperAdmin } from "@/lib/roles";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/pagination";
+import { CUSTOMERS_DIRECTORY_STALE_MS } from "@/lib/query-stale";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -102,7 +103,7 @@ export default function CustomersPage() {
     queryKey: ["customers-directory", params],
     queryFn: () => fetchCustomersDirectory<CustomerRow>(params),
     enabled: authReady,
-    staleTime: 60_000,
+    staleTime: CUSTOMERS_DIRECTORY_STALE_MS,
   });
 
   const rows = data?.items ?? [];

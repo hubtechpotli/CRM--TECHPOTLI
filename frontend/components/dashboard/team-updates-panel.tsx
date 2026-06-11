@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuthReady } from "@/hooks/use-auth-ready";
 import type { GlobalWorkItem, TeamFeedResponse, TeamUpdatesSummary } from "@/lib/team-updates";
 import { normalizePaginated } from "@/lib/pagination";
+import { TEAM_FEED_STALE_MS } from "@/lib/query-stale";
 export function TeamUpdatesPanel() {
   const { authReady } = useAuthReady();
 
@@ -17,8 +18,8 @@ export function TeamUpdatesPanel() {
       return res.data;
     },
     enabled: authReady,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: TEAM_FEED_STALE_MS,
+    refetchInterval: TEAM_FEED_STALE_MS,
   });
 
   const { data: feedPage, isLoading } = useQuery({
@@ -30,8 +31,8 @@ export function TeamUpdatesPanel() {
       return normalizePaginated<GlobalWorkItem>(res.data);
     },
     enabled: authReady,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: TEAM_FEED_STALE_MS,
+    refetchInterval: TEAM_FEED_STALE_MS,
   });
 
   const items = feedPage?.data ?? [];

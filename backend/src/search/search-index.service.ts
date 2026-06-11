@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { CustomerStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type SearchEntityType = 'CUSTOMER' | 'LEAD' | 'PROJECT' | 'INVOICE' | 'USER';
@@ -174,6 +174,56 @@ export class SearchIndexService {
 
   async deleteEntity(entityType: SearchEntityType, entityId: string) {
     await this.prisma.searchIndex.deleteMany({ where: { entityType, entityId } });
+  }
+
+  async searchCustomerDirectory(
+    term: string,
+    filters: { status?: CustomerStatus; state?: string; assignedEmployeeId?: string },
+    page: number,
+    limit: number,
+  ): Promise<{ ids: string[]; total: number }> {
+    const offset = Math.max(0, (page - 1) * limit);
+    const statusCond = filters.status
+      ? Prisma.sql`AND c.status = ${filters.status}::"CustomerStatus"`
+      : Prisma.empty;
+    const stateCond = filters.state ? Prisma.sql`AND c.state = ${filters.state}` : Prisma.empty;
+    const assigneeCond = filters.assignedEmployeeId
+      ? Prisma.sql`AND c."assignedEmployeeId" = ${filters.assignedEmployeeId}`
+      : Prisma.empty;
+
+    const [rows, countRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ entityId: string }>>`
+        SELECT si."entityId"
+        FROM "SearchIndex" si
+        INNER JOIN "Customer" c ON c.id = si."entityId"
+        WHERE si."entityType" = 'CUSTOMER'
+          AND to_tsvector(
+            'english',
+            coalesce(si.title, '') || ' ' || coalesce(si.subtitle, '') || ' ' || coalesce(si."searchText", '')
+          ) @@ plainto_tsquery('english', ${term})
+          ${statusCond}
+          ${stateCond}
+          ${assigneeCond}
+        ORDER BY si."updatedAt" DESC
+        LIMIT ${limit} OFFSET ${offset}`,
+      this.prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "SearchIndex" si
+        INNER JOIN "Customer" c ON c.id = si."entityId"
+        WHERE si."entityType" = 'CUSTOMER'
+          AND to_tsvector(
+            'english',
+            coalesce(si.title, '') || ' ' || coalesce(si.subtitle, '') || ' ' || coalesce(si."searchText", '')
+          ) @@ plainto_tsquery('english', ${term})
+          ${statusCond}
+          ${stateCond}
+          ${assigneeCond}`,
+    ]);
+
+    return {
+      ids: rows.map((r) => r.entityId),
+      total: Number(countRows[0]?.count ?? 0),
+    };
   }
 
   async keywordSearchFromIndex(term: string, userRole?: string, userId?: string) {

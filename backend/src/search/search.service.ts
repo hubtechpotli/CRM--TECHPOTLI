@@ -22,7 +22,7 @@ export class SearchService {
     if (!term) return { customers: [], leads: [], projects: [], invoices: [], users: [], semantic: [] };
 
     const cacheKey = `search:${term.toLowerCase()}:${userRole ?? 'anon'}:${userId ?? ''}`;
-    return this.cache.wrap(cacheKey, 60, async () => {
+    return this.cache.wrap(cacheKey, 120, async () => {
       const keyword = await this.keywordSearch(term, userRole, userId);
       const semantic = term.length >= 3 ? await this.semanticSearch(term, userRole, userId) : [];
       return { ...keyword, semantic };

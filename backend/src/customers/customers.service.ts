@@ -65,34 +65,94 @@ export class CustomersService {
     return this.prisma.customer.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  private mapDirectoryRows(
+    rows: Array<
+      Prisma.CustomerGetPayload<{
+        include: {
+          assignedEmployee: { select: { id: true; name: true } };
+          summary: true;
+        };
+      }>
+    >,
+  ) {
+    return rows.map(({ summary, ...row }) => ({
+      ...row,
+      openWorkItemCount: summary?.openTasks ?? 0,
+      projectCount: summary?.projectCount ?? 0,
+      invoiceCount: summary?.invoiceCount ?? 0,
+      pendingAmount: summary ? Number(summary.pendingAmount) : 0,
+      lastActivityAt: summary?.lastActivityAt ?? null,
+    }));
+  }
+
   async directory(
     filters?: { status?: CustomerStatus; state?: string; q?: string; assignedEmployeeId?: string },
     page = 1,
-    limit = 50,
+    limit = parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10),
   ) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(500, Math.max(1, limit));
     const ns = await this.cache.namespaceVersion('customers-directory');
     const cacheKey = `customers:directory:${ns}:${JSON.stringify(filters ?? {})}:${safePage}:${safeLimit}`;
+    const cacheTtl = filters?.q?.trim() ? 120 : 180;
 
-    return this.cache.wrap(cacheKey, 60, async () => {
+    return this.cache.wrap(cacheKey, cacheTtl, async () => {
+      const searchTerm = filters?.q?.trim();
+      if (searchTerm) {
+        try {
+          const indexCount = await this.prisma.searchIndex.count({ where: { entityType: 'CUSTOMER' } });
+          if (indexCount > 0) {
+            const { ids, total } = await this.searchIndex.searchCustomerDirectory(
+              searchTerm,
+              {
+                status: filters?.status,
+                state: filters?.state,
+                assignedEmployeeId: filters?.assignedEmployeeId,
+              },
+              safePage,
+              safeLimit,
+            );
+            if (!ids.length) {
+              return { items: [], total, page: safePage, limit: safeLimit };
+            }
+            const rows = await this.prisma.customer.findMany({
+              where: { id: { in: ids } },
+              include: {
+                assignedEmployee: { select: { id: true, name: true } },
+                summary: true,
+              },
+            });
+            const byId = new Map(rows.map((row) => [row.id, row]));
+            const ordered = ids.map((id) => byId.get(id)).filter((row): row is NonNullable<typeof row> => !!row);
+            return {
+              items: this.mapDirectoryRows(ordered),
+              total,
+              page: safePage,
+              limit: safeLimit,
+            };
+          }
+        } catch {
+          /* fall through to ILIKE */
+        }
+      }
+
       const where: Prisma.CustomerWhereInput = {};
       if (filters?.status) where.status = filters.status;
       if (filters?.state) where.state = filters.state;
       if (filters?.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
-      if (filters?.q) {
+      if (searchTerm) {
         where.OR = [
-          { companyName: { contains: filters.q, mode: 'insensitive' } },
-          { ownerName: { contains: filters.q, mode: 'insensitive' } },
-          { phone: { contains: filters.q } },
-          { email: { contains: filters.q, mode: 'insensitive' } },
+          { companyName: { contains: searchTerm, mode: 'insensitive' } },
+          { ownerName: { contains: searchTerm, mode: 'insensitive' } },
+          { phone: { contains: searchTerm } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
         ];
       }
 
       const [rows, total] = await Promise.all([
         this.prisma.customer.findMany({
           where,
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
           skip: (safePage - 1) * safeLimit,
           take: safeLimit,
           include: {
@@ -104,14 +164,7 @@ export class CustomersService {
       ]);
 
       return {
-        items: rows.map(({ summary, ...row }) => ({
-          ...row,
-          openWorkItemCount: summary?.openTasks ?? 0,
-          projectCount: summary?.projectCount ?? 0,
-          invoiceCount: summary?.invoiceCount ?? 0,
-          pendingAmount: summary ? Number(summary.pendingAmount) : 0,
-          lastActivityAt: summary?.lastActivityAt ?? null,
-        })),
+        items: this.mapDirectoryRows(rows),
         total,
         page: safePage,
         limit: safeLimit,

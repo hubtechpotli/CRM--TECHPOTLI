@@ -15,6 +15,7 @@ import {
   type TeamFeedResponse,
 } from "@/lib/team-updates";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, normalizePaginated } from "@/lib/pagination";
+import { TEAM_FEED_STALE_MS } from "@/lib/query-stale";
 import { useAssignees } from "@/hooks/use-users";
 import {
   customerToOption,
@@ -257,7 +258,7 @@ export function TeamUpdatesFeed({
       return normalizePaginated<GlobalWorkItem>(res.data);
     },
     enabled: authReady,
-    staleTime: 30_000,
+    staleTime: TEAM_FEED_STALE_MS,
   });
 
   const items = feedPage?.data ?? [];
@@ -287,7 +288,7 @@ export function TeamUpdatesFeed({
     queryKey: ["projects-filter", filterCustomer],
     queryFn: async () => {
       const res = await api.get("/projects", {
-        params: { limit: 100, ...(filterCustomer ? { customerId: filterCustomer } : {}) },
+        params: { limit: DEFAULT_PAGE_SIZE, ...(filterCustomer ? { customerId: filterCustomer } : {}) },
       });
       return normalizePaginated<{ id: string; name?: string }>(res.data).data;
     },
@@ -298,7 +299,7 @@ export function TeamUpdatesFeed({
     queryKey: ["customer-projects", form.customerId],
     queryFn: async (): Promise<Array<{ id: string; name?: string }>> => {
       const res = await api.get<Array<{ id: string; name?: string }>>("/projects", {
-        params: { customerId: form.customerId, limit: 100 },
+        params: { customerId: form.customerId, limit: DEFAULT_PAGE_SIZE },
       });
       if (Array.isArray(res.data)) return res.data;
       return (normalizePaginated(res.data).data ?? []) as Array<{ id: string; name?: string }>;

@@ -28,6 +28,12 @@ import { NAV_GROUPS, roleLabel } from "@/lib/shell-nav-groups";
 import { resolvePageMeta } from "@/lib/page-meta";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
+  CUSTOMERS_DIRECTORY_STALE_MS,
+  LIST_STALE_MS,
+  REPORTS_STALE_MS,
+  TEAM_FEED_STALE_MS,
+} from "@/lib/query-stale";
+import {
   getPageIcon,
   getRouteColor,
   shouldShowSectionHero,
@@ -94,7 +100,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       queryClient.prefetchQuery({
         queryKey: ["crm-insights"],
         queryFn: async () => (await api.get("/reports/crm-insights")).data,
-        staleTime: 60_000,
+        staleTime: REPORTS_STALE_MS,
       });
     }
     if (href === "/customers") {
@@ -109,7 +115,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         queryKey: ["customers-directory", customerParams],
         queryFn: async () =>
           (await import("@/lib/customers-directory")).fetchCustomersDirectory(customerParams),
-        staleTime: 60_000,
+        staleTime: CUSTOMERS_DIRECTORY_STALE_MS,
       });
     }
     if (href === "/leads") {
@@ -117,14 +123,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         queryKey: ["leads", "", "", 1, DEFAULT_PAGE_SIZE],
         queryFn: async () =>
           (await api.get("/leads", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
-        staleTime: 60_000,
+        staleTime: LIST_STALE_MS,
       });
     }
     if (href === "/team-updates") {
       queryClient.prefetchQuery({
         queryKey: ["team-updates-summary"],
         queryFn: async () => (await api.get("/team-updates/summary")).data,
-        staleTime: 60_000,
+        staleTime: TEAM_FEED_STALE_MS,
       });
     }
     if (href === "/invoices") {
@@ -132,7 +138,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         queryKey: ["invoices", 1, DEFAULT_PAGE_SIZE],
         queryFn: async () =>
           (await api.get("/invoices", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
-        staleTime: 30_000,
+        staleTime: LIST_STALE_MS,
       });
     }
     if (href === "/projects") {
@@ -140,7 +146,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         queryKey: ["projects", 1],
         queryFn: async () =>
           (await api.get("/projects", { params: { page: 1, limit: DEFAULT_PAGE_SIZE } })).data,
-        staleTime: 30_000,
+        staleTime: LIST_STALE_MS,
       });
     }
   }
@@ -152,8 +158,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       return res.data;
     },
     enabled: !!accessToken,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: TEAM_FEED_STALE_MS,
+    refetchInterval: TEAM_FEED_STALE_MS,
   });
   const teamBadgeCount = teamSummary?.openTotal ?? 0;
 

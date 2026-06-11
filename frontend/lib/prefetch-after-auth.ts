@@ -2,6 +2,11 @@ import type { QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+import {
+  CUSTOMERS_DIRECTORY_STALE_MS,
+  REPORTS_STALE_MS,
+  TEAM_FEED_STALE_MS,
+} from "@/lib/query-stale";
 
 export async function prefetchAfterAuth(
   queryClient: QueryClient,
@@ -11,12 +16,12 @@ export async function prefetchAfterAuth(
     queryClient.prefetchQuery({
       queryKey: ["crm-insights"],
       queryFn: async () => (await api.get("/reports/crm-insights")).data,
-      staleTime: 60_000,
+      staleTime: REPORTS_STALE_MS,
     }),
     queryClient.prefetchQuery({
       queryKey: ["reports-dashboard"],
       queryFn: async () => (await api.get("/reports/dashboard")).data,
-      staleTime: 60_000,
+      staleTime: REPORTS_STALE_MS,
     }),
     queryClient.prefetchQuery({
       queryKey: ["customers-directory", { page: 1, limit: DEFAULT_PAGE_SIZE }],
@@ -24,7 +29,7 @@ export async function prefetchAfterAuth(
         import("@/lib/customers-directory").then((m) =>
           m.fetchCustomersDirectory({ page: 1, limit: DEFAULT_PAGE_SIZE }),
         ),
-      staleTime: 60_000,
+      staleTime: CUSTOMERS_DIRECTORY_STALE_MS,
     }),
   ];
 
@@ -33,7 +38,7 @@ export async function prefetchAfterAuth(
       queryClient.prefetchQuery({
         queryKey: ["payments-summary"],
         queryFn: async () => (await api.get("/payments/summary")).data,
-        staleTime: 60_000,
+        staleTime: REPORTS_STALE_MS,
       }),
     );
   }
@@ -42,7 +47,7 @@ export async function prefetchAfterAuth(
     queryClient.prefetchQuery({
       queryKey: ["team-updates-summary"],
       queryFn: async () => (await api.get("/team-updates/summary")).data,
-      staleTime: 60_000,
+      staleTime: TEAM_FEED_STALE_MS,
     }),
   );
 

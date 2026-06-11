@@ -1,4 +1,7 @@
 export const DEFAULT_PAGE_SIZE = 20;
+
+/** Single-entity tabs (customer payments, projects per customer) without pagination UI. */
+export const SCOPED_LIST_LIMIT = 50;
 export const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 export const MAX_PAGE_SIZE = 100;
 

@@ -34,7 +34,7 @@ export class CustomersController {
     return this.customers.directory(
       { status, state, q, assignedEmployeeId },
       page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
+      limit ? parseInt(limit, 10) : parseInt(process.env.DEFAULT_LIST_LIMIT || '20', 10),
     );
   }
 

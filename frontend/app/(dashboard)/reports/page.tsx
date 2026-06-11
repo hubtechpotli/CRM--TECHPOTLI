@@ -19,6 +19,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ExportButtons } from "@/components/export-buttons";
 import { CardSkeleton, KpiRowSkeleton, Skeleton } from "@/components/ui/skeleton";
+import { REPORTS_STALE_MS } from "@/lib/query-stale";
 
 type ReportStats = {
   leads: number;
@@ -100,6 +101,7 @@ export default function ReportsPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const { data: leaderboard = [], isLoading: leaderboardLoading } = useQuery({
@@ -109,6 +111,7 @@ export default function ReportsPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const { data: mrr, isLoading: mrrLoading } = useQuery({
@@ -118,6 +121,7 @@ export default function ReportsPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const { data: pl, isLoading: plLoading } = useQuery({
@@ -127,6 +131,7 @@ export default function ReportsPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const { data: teamWork, isLoading: teamWorkLoading } = useQuery({
@@ -136,6 +141,7 @@ export default function ReportsPage() {
       return res.data;
     },
     enabled: authReady && adminView,
+    staleTime: REPORTS_STALE_MS,
   });
 
   return (

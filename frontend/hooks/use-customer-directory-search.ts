@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchCustomersDirectory } from "@/lib/customers-directory";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { CUSTOMERS_DIRECTORY_STALE_MS } from "@/lib/query-stale";
 
 export type CustomerSearchRow = {
   id: string;
@@ -30,7 +31,7 @@ export function useCustomerDirectorySearch(query: string, enabled = true) {
       return data;
     },
     enabled: canFetch,
-    staleTime: 60_000,
+    staleTime: CUSTOMERS_DIRECTORY_STALE_MS,
     gcTime: 5 * 60_000,
     placeholderData: keepPreviousData,
   });

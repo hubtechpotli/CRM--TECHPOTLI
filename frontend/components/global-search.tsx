@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { SEARCH_STALE_MS } from "@/lib/query-stale";
 
 type SearchResults = {
   customers: { id: string; companyName: string; ownerName?: string }[];
@@ -21,9 +23,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
-  const [results, setResults] = useState<SearchResults | null>(null);
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const trimmedQuery = debouncedQuery.trim();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -37,50 +37,23 @@ export function GlobalSearch() {
   }, []);
 
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      setResults(null);
-      abortRef.current?.abort();
-    }
+    if (!open) setQuery("");
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const q = debouncedQuery.trim();
-    if (!q) {
-      setResults(null);
-      setLoading(false);
-      abortRef.current?.abort();
-      return;
-    }
-
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-
-    api
-      .get<SearchResults>("/search", { params: { q }, signal: controller.signal })
-      .then((res) => {
-        if (!controller.signal.aborted) setResults(res.data);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setResults(null);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [debouncedQuery, open]);
+  const { data: results, isFetching: loading } = useQuery({
+    queryKey: ["global-search", trimmedQuery],
+    queryFn: async () => {
+      const res = await api.get<SearchResults>("/search", { params: { q: trimmedQuery } });
+      return res.data;
+    },
+    enabled: open && trimmedQuery.length > 0,
+    staleTime: SEARCH_STALE_MS,
+    gcTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
-    if (!value.trim()) {
-      setResults(null);
-      setLoading(false);
-    }
   }, []);
 
   function navigate(href: string) {

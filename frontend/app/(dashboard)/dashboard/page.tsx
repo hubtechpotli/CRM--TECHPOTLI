@@ -11,6 +11,7 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import { KpiSparklineCard } from "@/components/dashboard/kpi-sparkline-card";
 import { DashboardHeroBanner } from "@/components/dashboard/dashboard-hero-banner";
 import { TeamUpdatesPanel } from "@/components/dashboard/team-updates-panel";
+import { REPORTS_STALE_MS } from "@/lib/query-stale";
 
 const LeadsOverviewChart = dynamic(
   () => import("@/components/dashboard/leads-overview-chart").then((m) => m.LeadsOverviewChart),
@@ -32,8 +33,6 @@ const TopSalespeople = dynamic(
   () => import("@/components/dashboard/top-salespeople").then((m) => m.TopSalespeople),
   { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-xl bg-muted/40" /> },
 );
-
-const QUERY_STALE_MS = 60_000;
 
 type CrmInsights = {
   kpis: {
@@ -105,7 +104,7 @@ export default function DashboardPage() {
       return res.data;
     },
     enabled: authReady,
-    staleTime: QUERY_STALE_MS,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const { data: activityData, isLoading: activityLoading } = useQuery({
@@ -115,7 +114,7 @@ export default function DashboardPage() {
       return res.data;
     },
     enabled: authReady,
-    staleTime: QUERY_STALE_MS,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const { data: collectionsSummary, isLoading: collectionsLoading } = useQuery({
@@ -128,7 +127,7 @@ export default function DashboardPage() {
       return res.data;
     },
     enabled: authReady && adminView,
-    staleTime: QUERY_STALE_MS,
+    staleTime: REPORTS_STALE_MS,
   });
 
   const filteredLeads = useMemo(() => {

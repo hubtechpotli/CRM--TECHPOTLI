@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileImage } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
+import { SCOPED_LIST_LIMIT } from "@/lib/pagination";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Modal } from "@/components/ui/modal";
 import { PaymentForm } from "@/components/payments/payment-form";
@@ -50,7 +51,7 @@ export function CustomerPaymentsPanel({
     queryKey: paymentsKey,
     queryFn: async () => {
       const res = await api.get<PaymentsResponse>("/payments", {
-        params: { customerId, limit: 100 },
+        params: { customerId, limit: SCOPED_LIST_LIMIT },
       });
       return res.data;
     },
