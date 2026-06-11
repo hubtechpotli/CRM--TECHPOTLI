@@ -55,6 +55,7 @@ export function SearchableSelect({
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevValueRef = useRef(value);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<SearchableOption | null>(null);
@@ -65,11 +66,10 @@ export function SearchableSelect({
   const showDropdown = open && !disabled;
 
   useEffect(() => {
-    if (!value) {
-      const timer = window.setTimeout(() => setPicked(null), 200);
-      return () => window.clearTimeout(timer);
+    if (prevValueRef.current && !value) {
+      setPicked(null);
     }
-    return undefined;
+    prevValueRef.current = value;
   }, [value]);
 
   useEffect(() => {
@@ -104,14 +104,14 @@ export function SearchableSelect({
   }
 
   function selectOption(opt: SearchableOption) {
-    setPicked(opt);
-    setOpen(false);
-    setQuery("");
     if (onOptionSelect) {
       onOptionSelect(opt);
     } else {
       onChange(opt.value);
     }
+    setPicked(opt);
+    setOpen(false);
+    setQuery("");
     queueMicrotask(() => onSearchChange?.(""));
   }
 

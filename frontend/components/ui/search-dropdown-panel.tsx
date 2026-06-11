@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, type RefObject, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import * as DismissableLayer from "@radix-ui/react-dismissable-layer";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -194,12 +195,8 @@ export function SearchDropdownPanel({
   if (!open || !mounted || !style) return null;
 
   const panel = (
-    <div
-      {...{ [attrName]: true }}
-      className={cn(
-        "flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl",
-        className,
-      )}
+    <DismissableLayer.Branch
+      className="pointer-events-auto"
       style={{
         position: "fixed",
         top: style.top,
@@ -208,16 +205,26 @@ export function SearchDropdownPanel({
         maxHeight: style.maxHeight,
         zIndex: PANEL_Z_INDEX,
         transform: style.flipUp ? "translateY(-100%)" : undefined,
+        pointerEvents: "auto",
       }}
+      onPointerDown={(e) => e.stopPropagation()}
     >
-      {header ? <div className="shrink-0 border-b border-border">{header}</div> : null}
-      <div className="min-h-0 flex-1 overflow-y-auto p-1">{children}</div>
-      {footer ? (
-        <div className="shrink-0 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          {footer}
-        </div>
-      ) : null}
-    </div>
+      <div
+        {...{ [attrName]: true }}
+        className={cn(
+          "flex h-full max-h-[inherit] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl",
+          className,
+        )}
+      >
+        {header ? <div className="shrink-0 border-b border-border">{header}</div> : null}
+        <div className="min-h-0 flex-1 overflow-y-auto p-1">{children}</div>
+        {footer ? (
+          <div className="shrink-0 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+            {footer}
+          </div>
+        ) : null}
+      </div>
+    </DismissableLayer.Branch>
   );
 
   return createPortal(panel, document.body);

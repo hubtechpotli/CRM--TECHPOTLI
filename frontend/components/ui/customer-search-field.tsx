@@ -43,6 +43,7 @@ export function CustomerSearchField({
 }) {
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const prevValueRef = useRef(value);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -66,11 +67,10 @@ export function CustomerSearchField({
   const showDropdown = open && enabled && !resolved && (isTyping || options.length > 0);
 
   useEffect(() => {
-    if (!value) {
-      const timer = window.setTimeout(() => setLocalPick(null), 200);
-      return () => window.clearTimeout(timer);
+    if (prevValueRef.current && !value) {
+      setLocalPick(null);
     }
-    return undefined;
+    prevValueRef.current = value;
   }, [value]);
 
   useEffect(() => {
@@ -97,11 +97,11 @@ export function CustomerSearchField({
   }
 
   function pick(opt: CustomerOption) {
+    onSelect(opt);
     setLocalPick(opt);
     setQuery("");
     setFocused(false);
     setOpen(false);
-    onSelect(opt);
   }
 
   function clearAll() {
