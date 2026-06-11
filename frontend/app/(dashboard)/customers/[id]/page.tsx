@@ -320,7 +320,14 @@ export default function CustomerDetailPage() {
       ) : null}
       {tab === "services" ? <CustomerServicesPanel customerId={id} /> : null}
       {tab === "revenue" ? <CustomerRevenuePanel customerId={id} /> : null}
-      {tab === "payments" ? <CustomerPaymentsPanel customerId={id} /> : null}
+      {tab === "payments" ? (
+        <CustomerPaymentsPanel
+          customerId={id}
+          customerName={data.companyName ? String(data.companyName) : undefined}
+          customerPhone={data.phone as string | null | undefined}
+          customerEmail={data.email as string | null | undefined}
+        />
+      ) : null}
       {tab === "credentials" ? <CustomerCredentialsPanel customerId={id} /> : null}
       {tab === "domains" ? <CustomerDomainsPanel customerId={id} /> : null}
       {tab === "hosting" ? <CustomerHostingPanel customerId={id} /> : null}
@@ -348,6 +355,11 @@ export default function CustomerDetailPage() {
       <Modal open={showProject} onClose={() => setShowProject(false)} title="New project" size="lg">
         <ProjectForm
           defaultCustomerId={id}
+          defaultCustomerOption={{
+            value: id,
+            label: String(data.companyName ?? "Customer"),
+            sublabel: [data.phone, data.email].filter(Boolean).join(" · ") || undefined,
+          }}
           onCancel={() => setShowProject(false)}
           onSuccess={(project) => {
             setShowProject(false);

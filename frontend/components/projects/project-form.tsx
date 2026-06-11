@@ -1,13 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 import { PROJECT_PRIORITIES, SERVICE_TYPES } from "@/lib/types";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { CustomerPickerField, type CustomerOption } from "@/components/ui/customer-picker-field";
 import { useAssignees } from "@/hooks/use-users";
 
 type ProjectFormData = {
@@ -29,24 +30,17 @@ function formatLabel(value: string) {
 
 export function ProjectForm({
   defaultCustomerId,
+  defaultCustomerOption,
   onSuccess,
   onCancel,
 }: {
   defaultCustomerId?: string;
+  defaultCustomerOption?: CustomerOption | null;
   onSuccess?: (data: Record<string, unknown>) => void;
   onCancel?: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: assignees = [] } = useAssignees();
-  const { data: customers = [] } = useQuery({
-    queryKey: ["customers-directory", { q: undefined }],
-    queryFn: async () => {
-      const data = await import("@/lib/customers-directory").then((m) =>
-        m.fetchCustomersDirectory({ limit: 500 }),
-      );
-      return data.items;
-    },
-  });
 
   const [form, setForm] = useState<ProjectFormData>({
     name: "",
@@ -145,19 +139,14 @@ export function ProjectForm({
         <FormField label="Project name" className="sm:col-span-2">
           <TextInput value={form.name} onChange={(v) => set("name", v)} required />
         </FormField>
-        <FormField label="Customer">
-          <SelectInput
-            value={form.customerId}
-            onChange={(v) => set("customerId", v)}
-            placeholder="Select customer"
-            required
-            disabled={!!defaultCustomerId}
-            options={customers.map((c) => ({
-              value: String(c.id),
-              label: String(c.companyName ?? c.id),
-            }))}
-          />
-        </FormField>
+        <CustomerPickerField
+          value={form.customerId}
+          onChange={(v) => set("customerId", v)}
+          label="Customer"
+          required
+          lockSelection={!!defaultCustomerId}
+          defaultOption={defaultCustomerOption}
+        />
         <FormField label="Service type">
           <SelectInput
             value={form.serviceType}

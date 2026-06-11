@@ -10,7 +10,7 @@ import { formatLabel } from "@/lib/format";
 import { appendToMatchingLists, createTempId } from "@/lib/optimistic-mutation";
 import { uploadFileWithProgress } from "@/lib/upload-file";
 import { PAYMENT_METHODS, PAYMENT_STATUSES } from "@/lib/types";
-import { CustomerPickerField } from "@/components/ui/customer-picker-field";
+import { CustomerPickerField, type CustomerOption } from "@/components/ui/customer-picker-field";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
 import { FormFooterActions, FormShell } from "@/components/ui/form-shell";
 import { FormSection } from "@/components/ui/form-section";
@@ -49,10 +49,12 @@ const emptyForm: PaymentFormData = {
 
 export function PaymentForm({
   defaultValues,
+  defaultCustomerOption,
   onSuccess,
   onCancel,
 }: {
   defaultValues?: Partial<PaymentFormData>;
+  defaultCustomerOption?: CustomerOption | null;
   onSuccess?: (data: Record<string, unknown>) => void;
   onCancel?: () => void;
 }) {
@@ -251,7 +253,8 @@ export function PaymentForm({
           onChange={(v) => set("customerId", v)}
           label="Company / Customer"
           required
-          disabled={!!defaultValues?.customerId}
+          lockSelection={!!defaultValues?.customerId}
+          defaultOption={defaultCustomerOption}
         />
       </FormSection>
 

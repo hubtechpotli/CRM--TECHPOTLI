@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { appendToMatchingLists, createTempId, replaceMatchingListItemId } from "@/lib/optimistic-mutation";
 import { isAxiosError } from "axios";
@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
 import { RENEWAL_TYPES } from "@/lib/types";
 import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/form-field";
+import { CustomerPickerField } from "@/components/ui/customer-picker-field";
 
 export function RenewalForm({
   onSuccess,
@@ -26,16 +27,6 @@ export function RenewalForm({
     notes: "",
   });
   const [error, setError] = useState<string | null>(null);
-
-  const { data: customers = [] } = useQuery({
-    queryKey: ["customers-directory", { q: undefined }],
-    queryFn: async () => {
-      const data = await import("@/lib/customers-directory").then((m) =>
-        m.fetchCustomersDirectory({ limit: 500 }),
-      );
-      return data.items;
-    },
-  });
 
   const mutation = useOptimisticMutation({
     mutationFn: async () => {
@@ -94,18 +85,14 @@ export function RenewalForm({
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Customer" className="sm:col-span-2">
-          <SelectInput
+        <div className="sm:col-span-2">
+          <CustomerPickerField
             value={form.customerId}
             onChange={(v) => setForm((f) => ({ ...f, customerId: v }))}
-            placeholder="Select customer"
+            label="Customer"
             required
-            options={customers.map((c) => ({
-              value: String(c.id),
-              label: String(c.companyName ?? c.id),
-            }))}
           />
-        </FormField>
+        </div>
         <FormField label="Type">
           <SelectInput
             value={form.type}

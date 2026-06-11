@@ -9,6 +9,7 @@ import { formatDate, formatLabel, formatMoney } from "@/lib/format";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Modal } from "@/components/ui/modal";
 import { PaymentForm } from "@/components/payments/payment-form";
+import type { CustomerOption } from "@/components/ui/customer-picker-field";
 
 type PaymentRow = Record<string, unknown> & {
   proofUrl?: string | null;
@@ -19,11 +20,31 @@ type PaymentsResponse = {
   total: number;
 };
 
-export function CustomerPaymentsPanel({ customerId }: { customerId: string }) {
+export function CustomerPaymentsPanel({
+  customerId,
+  customerName,
+  customerPhone,
+  customerEmail,
+}: {
+  customerId: string;
+  customerName?: string;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+}) {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
 
   const paymentsKey = ["payments", { customerId }] as const;
+
+  const defaultCustomerOption = useMemo((): CustomerOption | undefined => {
+    if (!customerName) return undefined;
+    const sublabel = [customerPhone, customerEmail].filter(Boolean).join(" · ") || undefined;
+    return {
+      value: customerId,
+      label: customerName,
+      sublabel,
+    };
+  }, [customerId, customerName, customerPhone, customerEmail]);
 
   const { data, isLoading } = useQuery({
     queryKey: paymentsKey,
@@ -132,6 +153,7 @@ export function CustomerPaymentsPanel({ customerId }: { customerId: string }) {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Record collection">
         <PaymentForm
           defaultValues={{ customerId, status: "PAID" }}
+          defaultCustomerOption={defaultCustomerOption}
           onCancel={() => setShowAdd(false)}
           onSuccess={() => {
             setShowAdd(false);
