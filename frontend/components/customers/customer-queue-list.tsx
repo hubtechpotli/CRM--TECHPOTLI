@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { PremiumDataTable, type RowAction } from "@/components/dashboard/premium-data-table";
 import { CompanyAvatar } from "@/components/leads/lead-badges";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
+import { CustomerStatusBadge } from "@/components/customers/customer-status-badge";
 
 export type CustomerRow = Record<string, unknown> & {
   id: string;
@@ -26,20 +26,6 @@ function formatTime(value: string) {
     minute: "2-digit",
     hour12: true,
   });
-}
-
-function statusBadge(status: string) {
-  const styles =
-    status === "ACTIVE"
-      ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 dark:text-emerald-300"
-      : status === "CHURNED"
-        ? "bg-rose-500/10 text-rose-700 border-rose-500/25 dark:text-rose-300"
-        : "bg-slate-500/10 text-slate-600 border-slate-500/25 dark:text-slate-400";
-  return (
-    <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", styles)}>
-      {status}
-    </span>
-  );
 }
 
 export function CustomerListTable({
@@ -176,7 +162,7 @@ export function CustomerListTable({
         {
           key: "status",
           label: "Status",
-          render: (row) => statusBadge(String(row.status ?? "ACTIVE")),
+          render: (row) => <CustomerStatusBadge status={String(row.status ?? "ACTIVE")} />,
         },
       ]}
       footer={

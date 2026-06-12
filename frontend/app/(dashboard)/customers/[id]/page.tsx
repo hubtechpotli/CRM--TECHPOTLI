@@ -21,6 +21,7 @@ import { useAuthReady } from "@/hooks/use-auth-ready";
 import { queryRetryDelay, shouldRetryQuery } from "@/lib/query-retry";
 import { isSuperAdmin } from "@/lib/roles";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { CustomerStatusSelect } from "@/components/customers/customer-status-select";
 
 const CustomerServicesPanel = dynamic(
   () => import("@/components/customers/customer-services-panel").then((m) => m.CustomerServicesPanel),
@@ -243,9 +244,14 @@ export default function CustomerDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={String(data.companyName ?? "Customer")}
-        description={`${String(data.ownerName ?? "")} · ${String(data.status ?? "")}`}
+        description={String(data.ownerName ?? "")}
         action={
           <div className="flex flex-wrap items-center gap-3">
+            <CustomerStatusSelect
+              customerId={id}
+              status={String(data.status ?? "ACTIVE")}
+              compact
+            />
             <button
               type="button"
               onClick={() => favoriteMutation.mutate()}

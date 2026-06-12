@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CustomerStatus, CustomerWorkItemStatus, UserRole } from '@prisma/client';
 import { CustomersService } from './customers.service';
@@ -70,8 +82,15 @@ export class CustomersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.customers.update(id, body);
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, unknown>,
+  ) {
+    if (body.status !== undefined && !Object.values(CustomerStatus).includes(body.status as CustomerStatus)) {
+      throw new BadRequestException('Invalid customer status');
+    }
+    return this.customers.update(id, body as Parameters<CustomersService['update']>[1], user.sub);
   }
 
   @Delete(':id')

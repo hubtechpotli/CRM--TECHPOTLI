@@ -17,6 +17,11 @@ import { FormField, SelectInput, TextArea, TextInput } from "@/components/ui/for
 import { FormFooterActions, FormShell } from "@/components/ui/form-shell";
 import { FormSection } from "@/components/ui/form-section";
 import { useAssignees } from "@/hooks/use-users";
+import {
+  CUSTOMER_STATUSES,
+  confirmCustomerStatusChange,
+  type CustomerStatusValue,
+} from "@/lib/customer-status";
 
 type CustomerFormData = {
   companyName: string;
@@ -39,6 +44,7 @@ type CustomerFormData = {
   youtubeUrl: string;
   remarks: string;
   assignedEmployeeId: string;
+  status: CustomerStatusValue;
 };
 
 const emptyForm: CustomerFormData = {
@@ -62,6 +68,7 @@ const emptyForm: CustomerFormData = {
   youtubeUrl: "",
   remarks: "",
   assignedEmployeeId: "",
+  status: "ACTIVE",
 };
 
 function toFormData(customer?: Record<string, unknown>): CustomerFormData {
@@ -89,6 +96,7 @@ function toFormData(customer?: Record<string, unknown>): CustomerFormData {
     assignedEmployeeId: String(
       customer.assignedEmployeeId ?? (customer.assignedEmployee as { id?: string })?.id ?? ""
     ),
+    status: (customer.status as CustomerStatusValue) ?? "ACTIVE",
   };
 }
 
@@ -138,6 +146,7 @@ export function CustomerForm({
       instagramUrl: payload.instagramUrl.trim() || undefined,
       youtubeUrl: payload.youtubeUrl.trim() || undefined,
       remarks: payload.remarks.trim() || undefined,
+      status: payload.status,
     };
     if (payload.assignedEmployeeId) {
       body.assignedEmployee = { connect: { id: payload.assignedEmployeeId } };
@@ -197,6 +206,10 @@ export function CustomerForm({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (isEdit) {
+      const previous = (customer?.status as CustomerStatusValue) ?? "ACTIVE";
+      if (!confirmCustomerStatusChange(form.status, previous)) return;
+    }
     mutation.mutate(form);
   }
 
@@ -252,6 +265,16 @@ export function CustomerForm({
                 onChange={(v) => set("assignedEmployeeId", v)}
                 placeholder="Select assignee"
                 options={assignees.map((a) => ({ value: a.id, label: a.name }))}
+              />
+            </FormField>
+            <FormField
+              label="Account status"
+              hint={CUSTOMER_STATUSES.find((s) => s.value === form.status)?.hint}
+            >
+              <SelectInput
+                value={form.status}
+                onChange={(v) => set("status", v as CustomerStatusValue)}
+                options={CUSTOMER_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
               />
             </FormField>
           </div>

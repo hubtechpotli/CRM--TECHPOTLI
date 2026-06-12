@@ -26,6 +26,7 @@ import { SendCustomerEmailDto } from './dto/send-customer-email.dto';
 import { CacheService } from '../redis/cache.service';
 import { CustomerSummaryRefreshService } from './customer-summary-refresh.service';
 import { SearchIndexService } from '../search/search-index.service';
+import { customerStatusDisplayLabel } from '../common/utils/customer-status.util';
 
 @Injectable()
 export class CustomersService {
@@ -259,7 +260,26 @@ export class CustomersService {
     return customer;
   }
 
-  async update(id: string, data: Prisma.CustomerUpdateInput) {
+  async update(id: string, data: Prisma.CustomerUpdateInput, actorId?: string) {
+    const existing = await this.prisma.customer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Customer not found');
+
+    if (data.status !== undefined && data.status !== null) {
+      const nextStatus = data.status as CustomerStatus;
+      if (!Object.values(CustomerStatus).includes(nextStatus)) {
+        throw new BadRequestException('Invalid customer status');
+      }
+      if (nextStatus !== existing.status && actorId) {
+        await this.appendTimelineEvent(id, {
+          eventType: 'NOTE_ADDED',
+          title: 'Account status changed',
+          description: `Status changed to ${customerStatusDisplayLabel(nextStatus)}`,
+          userId: actorId,
+          metadata: { fromStatus: existing.status, toStatus: nextStatus },
+        });
+      }
+    }
+
     const customer = await this.prisma.customer.update({ where: { id }, data });
     await this.invalidateDirectoryCache();
     this.bumpSummary(id);

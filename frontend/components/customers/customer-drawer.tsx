@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Star, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { GlassCard } from "@/components/ui/glass-card";
+import { CustomerStatusBadge } from "@/components/customers/customer-status-badge";
 
 type CustomerDetail = Record<string, unknown>;
 
@@ -60,9 +61,7 @@ export function CustomerDrawer({
                   <p>{String(data.phone ?? "—")}</p>
                   <p>{String(data.email ?? "—")}</p>
                   <p>{String(data.state ?? "—")}</p>
-                  <span className="inline-block rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">
-                    {String(data.status ?? "—")}
-                  </span>
+                  <CustomerStatusBadge status={String(data.status ?? "ACTIVE")} />
                 </div>
               </GlassCard>
               <button

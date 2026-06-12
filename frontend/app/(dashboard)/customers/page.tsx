@@ -30,13 +30,7 @@ import { usePathname } from "next/navigation";
 import { getRouteColor } from "@/lib/nav-colors";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { FEATURE } from "@/lib/feature-colors";
-
-const STATUS_TABS = [
-  { value: "", label: "All" },
-  { value: "ACTIVE", label: "Active" },
-  { value: "INACTIVE", label: "Inactive" },
-  { value: "CHURNED", label: "Churned" },
-];
+import { CUSTOMER_STATUS_FILTER_TABS } from "@/lib/customer-status";
 
 export default function CustomersPage() {
   const pathname = usePathname();
@@ -156,7 +150,10 @@ export default function CustomersPage() {
 
       <SectionCard title="All customers" noPadding accent={routeColor}>
         <div className="space-y-4 border-b border-border/50 p-5 md:px-6">
-          <StatusTabs tabs={STATUS_TABS} value={statusFilter} onChange={setStatusFilter} accent={routeColor} />
+          <StatusTabs tabs={CUSTOMER_STATUS_FILTER_TABS} value={statusFilter} onChange={setStatusFilter} accent={routeColor} />
+          <p className="text-xs text-muted-foreground">
+            Filter by account status. Completely closed customers stay in the list — set them Active again when they return.
+          </p>
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />

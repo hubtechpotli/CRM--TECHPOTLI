@@ -1,6 +1,7 @@
 "use client";
 
 import { GlassCard } from "@/components/ui/glass-card";
+import { customerStatusLabel } from "@/lib/customer-status";
 
 function formatLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -52,6 +53,7 @@ export function CustomerProfileSections({ data }: { data: Record<string, unknown
           <InfoRow label="GST Number" value={data.gstNumber} />
           <InfoRow label="Nature of Business" value={data.natureOfBusiness} />
           <InfoRow label="Assigned Employee" value={employee?.name} />
+          <InfoRow label="Account status" value={customerStatusLabel(String(data.status ?? "ACTIVE"))} />
           <InfoRow label="Remarks" value={data.remarks} />
         </InfoSection>
 
