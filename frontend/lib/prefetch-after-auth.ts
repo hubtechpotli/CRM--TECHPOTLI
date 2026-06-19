@@ -1,6 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { isAdmin } from "@/lib/roles";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
   CUSTOMERS_DIRECTORY_STALE_MS,
@@ -50,17 +49,12 @@ export async function prefetchAfterAuth(
       queryFn: async () => (await api.get("/leads/kanban")).data,
       staleTime: LIST_STALE_MS,
     }),
+    queryClient.prefetchQuery({
+      queryKey: ["payments-summary", {}],
+      queryFn: async () => (await api.get("/payments/summary")).data,
+      staleTime: LIST_STALE_MS,
+    }),
   ];
-
-  if (isAdmin(role)) {
-    tasks.push(
-      queryClient.prefetchQuery({
-        queryKey: ["payments-summary"],
-        queryFn: async () => (await api.get("/payments/summary")).data,
-        staleTime: REPORTS_STALE_MS,
-      }),
-    );
-  }
 
   await Promise.allSettled(tasks);
 }

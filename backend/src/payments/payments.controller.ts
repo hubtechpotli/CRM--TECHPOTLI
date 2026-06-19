@@ -25,9 +25,13 @@ export class PaymentsController {
   constructor(private payments: PaymentsService) {}
 
   @Get('summary')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  summary(@CurrentUser() user: JwtPayload) {
-    return this.payments.summary(user.role);
+  summary(
+    @CurrentUser() user: JwtPayload,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.payments.summary(user.role, user.sub, { from, to, userId });
   }
 
   @Get('export')

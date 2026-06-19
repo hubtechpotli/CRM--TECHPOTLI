@@ -136,50 +136,91 @@ export class PaymentsService {
     return { items: withUrls, total, page, limit };
   }
 
-  async summary(userRole: string) {
-    if (!this.isAdmin(userRole)) {
-      throw new ForbiddenException('Only admins can view collection summary');
-    }
+  private paidDateWindow(
+    scope: Prisma.PaymentWhereInput,
+    from: Date,
+    to?: Date,
+  ): Prisma.PaymentWhereInput {
+    const dateFilter: Prisma.DateTimeFilter = { gte: from };
+    if (to) dateFilter.lte = to;
+    return {
+      ...scope,
+      OR: [
+        { collectedAt: dateFilter },
+        { collectedAt: null, createdAt: dateFilter },
+      ],
+    };
+  }
 
+  private parseSummaryRange(from?: string, to?: string) {
+    if (!from?.trim() || !to?.trim()) return null;
+    const fromDate = new Date(from);
+    fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) return null;
+    return { from: fromDate, to: toDate, fromIso: from, toIso: to };
+  }
+
+  async summary(
+    userRole: string,
+    userId: string,
+    filters?: { from?: string; to?: string; userId?: string },
+  ) {
     const now = new Date();
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const paidWhere = (from: Date, to?: Date): Prisma.PaymentWhereInput => ({
-      status: PaymentStatus.PAID,
-      collectedAt: to ? { gte: from, lte: to } : { gte: from },
-    });
+    const scope: Prisma.PaymentWhereInput = { status: PaymentStatus.PAID };
+    if (!this.isAdmin(userRole)) {
+      scope.createdById = userId;
+    } else if (filters?.userId) {
+      scope.createdById = filters.userId;
+    }
 
-    const [todayAgg, monthAgg, byUserRaw] = await Promise.all([
+    const range = this.parseSummaryRange(filters?.from, filters?.to);
+
+    const [todayAgg, monthAgg, allTimeAgg, rangeAgg, byUserRaw] = await Promise.all([
       this.prisma.payment.aggregate({
-        where: paidWhere(todayStart, now),
+        where: this.paidDateWindow(scope, todayStart, now),
         _sum: { paidAmount: true },
         _count: true,
       }),
       this.prisma.payment.aggregate({
-        where: paidWhere(monthStart, now),
+        where: this.paidDateWindow(scope, monthStart, now),
         _sum: { paidAmount: true },
         _count: true,
       }),
-      this.prisma.payment.groupBy({
-        by: ['createdById'],
-        where: paidWhere(monthStart, now),
+      this.prisma.payment.aggregate({
+        where: scope,
         _sum: { paidAmount: true },
         _count: true,
       }),
+      range
+        ? this.prisma.payment.aggregate({
+            where: this.paidDateWindow(scope, range.from, range.to),
+            _sum: { paidAmount: true },
+            _count: true,
+          })
+        : Promise.resolve(null),
+      this.isAdmin(userRole)
+        ? this.prisma.payment.groupBy({
+            by: ['createdById'],
+            where: this.paidDateWindow(scope, monthStart, now),
+            _sum: { paidAmount: true },
+            _count: true,
+          })
+        : Promise.resolve([]),
     ]);
 
-    const userIds = byUserRaw.map((r) => r.createdById);
-    const users = userIds.length
-      ? await this.prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { id: true, name: true },
-        })
-      : [];
-    const userMap = new Map(users.map((u) => [u.id, u.name]));
-
-    return {
+    const result: {
+      today: { count: number; amount: number };
+      month: { count: number; amount: number };
+      allTime: { count: number; amount: number };
+      range?: { count: number; amount: number; from: string; to: string };
+      byUser?: Array<{ userId: string; name: string; count: number; amount: number }>;
+    } = {
       today: {
         count: todayAgg._count,
         amount: Number(todayAgg._sum.paidAmount ?? 0),
@@ -188,15 +229,41 @@ export class PaymentsService {
         count: monthAgg._count,
         amount: Number(monthAgg._sum.paidAmount ?? 0),
       },
-      byUser: byUserRaw
+      allTime: {
+        count: allTimeAgg._count,
+        amount: Number(allTimeAgg._sum.paidAmount ?? 0),
+      },
+    };
+
+    if (range && rangeAgg) {
+      result.range = {
+        count: rangeAgg._count,
+        amount: Number(rangeAgg._sum.paidAmount ?? 0),
+        from: range.fromIso,
+        to: range.toIso,
+      };
+    }
+
+    if (this.isAdmin(userRole) && byUserRaw.length) {
+      const userIds = byUserRaw.map((r) => r.createdById);
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true },
+      });
+      const userMap = new Map(users.map((u) => [u.id, u.name]));
+      result.byUser = byUserRaw
         .map((r) => ({
           userId: r.createdById,
           name: userMap.get(r.createdById) ?? 'Unknown',
           count: r._count,
           amount: Number(r._sum.paidAmount ?? 0),
         }))
-        .sort((a, b) => b.amount - a.amount),
-    };
+        .sort((a, b) => b.amount - a.amount);
+    } else if (this.isAdmin(userRole)) {
+      result.byUser = [];
+    }
+
+    return result;
   }
 
   async findOne(id: string, userRole: string, userId: string, opts?: { includeProof?: boolean }) {

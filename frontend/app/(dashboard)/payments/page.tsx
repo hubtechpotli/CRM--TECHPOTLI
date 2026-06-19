@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileImage, Plus, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate, formatLabel, formatMoney } from "@/lib/format";
@@ -23,6 +23,7 @@ import { isTempId } from "@/lib/optimistic-mutation";
 import { PAYMENT_STATUSES } from "@/lib/types";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { PaginationFooter } from "@/components/ui/pagination-footer";
+import { LIST_STALE_MS } from "@/lib/query-stale";
 
 type PaymentRow = Record<string, unknown> & {
   customer?: { companyName?: string };
@@ -40,11 +41,26 @@ type PaymentsResponse = {
 type SummaryResponse = {
   today: { count: number; amount: number };
   month: { count: number; amount: number };
-  byUser: Array<{ userId: string; name: string; count: number; amount: number }>;
+  allTime: { count: number; amount: number };
+  range?: { count: number; amount: number; from: string; to: string };
+  byUser?: Array<{ userId: string; name: string; count: number; amount: number }>;
 };
+
+function toDayStartIso(dateStr: string) {
+  const d = new Date(dateStr);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function toDayEndIso(dateStr: string) {
+  const d = new Date(dateStr);
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
 
 export default function PaymentsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { authReady } = useAuthReady();
   const adminView = isAdmin(user?.role);
@@ -54,11 +70,16 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [range, setRange] = useState<"" | "today" | "month">("");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebouncedValue(search);
 
   const dateRange = useMemo(() => {
+    if (customFrom && customTo) {
+      return { from: toDayStartIso(customFrom), to: toDayEndIso(customTo) };
+    }
     const now = new Date();
     if (range === "today") {
       const start = new Date(now);
@@ -70,7 +91,17 @@ export default function PaymentsPage() {
       return { from: start.toISOString(), to: now.toISOString() };
     }
     return { from: undefined, to: undefined };
-  }, [range]);
+  }, [range, customFrom, customTo]);
+
+  const summaryParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (customFrom && customTo) {
+      params.from = customFrom;
+      params.to = customTo;
+    }
+    if (adminView && userFilter) params.userId = userFilter;
+    return params;
+  }, [customFrom, customTo, adminView, userFilter]);
 
   const queryParams = useMemo(
     () => ({
@@ -92,24 +123,45 @@ export default function PaymentsPage() {
       return res.data;
     },
     enabled: authReady,
+    staleTime: LIST_STALE_MS,
   });
 
   const { data: summary } = useQuery({
-    queryKey: ["payments-summary"],
+    queryKey: ["payments-summary", summaryParams],
     queryFn: async () => {
-      const res = await api.get<SummaryResponse>("/payments/summary");
+      const res = await api.get<SummaryResponse>("/payments/summary", { params: summaryParams });
       return res.data;
     },
-    enabled: authReady && adminView,
+    enabled: authReady,
+    staleTime: LIST_STALE_MS,
   });
 
   const rows = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const hasCustomRange = Boolean(customFrom && customTo);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, userFilter, range, pageSize]);
+  }, [debouncedSearch, statusFilter, userFilter, range, customFrom, customTo, pageSize]);
+
+  function handleRangeChange(v: string) {
+    setRange(v as "" | "today" | "month");
+    if (v) {
+      setCustomFrom("");
+      setCustomTo("");
+    }
+  }
+
+  function handleCustomFrom(v: string) {
+    setCustomFrom(v);
+    if (v) setRange("");
+  }
+
+  function handleCustomTo(v: string) {
+    setCustomTo(v);
+    if (v) setRange("");
+  }
 
   async function handleExport() {
     try {
@@ -155,40 +207,63 @@ export default function PaymentsPage() {
         }
       />
 
-      {adminView && summary ? (
-        <div className="grid gap-4 sm:grid-cols-3">
+      {summary ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <GlassCard>
-            <p className="text-xs text-muted-foreground">Today&apos;s collection</p>
+            <p className="text-xs text-muted-foreground">
+              {adminView ? "Today's collection" : "Your collection today"}
+            </p>
             <p className="mt-1 text-2xl font-bold">{formatMoney(summary.today.amount)}</p>
             <p className="text-xs text-muted-foreground">{summary.today.count} payments</p>
           </GlassCard>
           <GlassCard>
-            <p className="text-xs text-muted-foreground">This month</p>
+            <p className="text-xs text-muted-foreground">
+              {adminView ? "This month" : "Your collection this month"}
+            </p>
             <p className="mt-1 text-2xl font-bold">{formatMoney(summary.month.amount)}</p>
             <p className="text-xs text-muted-foreground">{summary.month.count} payments</p>
           </GlassCard>
           <GlassCard>
-            <p className="text-xs text-muted-foreground">Top collectors (month)</p>
-            <ul className="mt-2 space-y-1 text-sm">
-              {summary.byUser.slice(0, 3).map((u) => (
-                <li key={u.userId} className="flex justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setUserFilter(u.userId)}
-                    className="truncate text-left hover:text-primary"
-                  >
-                    {u.name}
-                  </button>
-                  <span className="shrink-0 font-medium">{formatMoney(u.amount)}</span>
-                </li>
-              ))}
-            </ul>
+            <p className="text-xs text-muted-foreground">
+              {adminView ? "Overall (team)" : "Your total (all time)"}
+            </p>
+            <p className="mt-1 text-2xl font-bold">{formatMoney(summary.allTime.amount)}</p>
+            <p className="text-xs text-muted-foreground">{summary.allTime.count} payments</p>
           </GlassCard>
+          {hasCustomRange && summary.range ? (
+            <GlassCard>
+              <p className="text-xs text-muted-foreground">
+                {adminView ? "Selected period" : "Your selected period"}
+              </p>
+              <p className="mt-1 text-2xl font-bold">{formatMoney(summary.range.amount)}</p>
+              <p className="text-xs text-muted-foreground">
+                {summary.range.count} payments · {formatDate(summary.range.from)} – {formatDate(summary.range.to)}
+              </p>
+            </GlassCard>
+          ) : adminView && summary.byUser ? (
+            <GlassCard>
+              <p className="text-xs text-muted-foreground">Top collectors (month)</p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {summary.byUser.slice(0, 3).map((u) => (
+                  <li key={u.userId} className="flex justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUserFilter(u.userId)}
+                      className="truncate text-left hover:text-primary"
+                    >
+                      {u.name}
+                    </button>
+                    <span className="shrink-0 font-medium">{formatMoney(u.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </GlassCard>
+          ) : null}
         </div>
       ) : null}
 
       <GlassCard className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <div className="pl-8">
@@ -203,7 +278,7 @@ export default function PaymentsPage() {
           />
           <SelectInput
             value={range}
-            onChange={(v) => setRange(v as "" | "today" | "month")}
+            onChange={handleRangeChange}
             placeholder="All dates"
             options={[
               { value: "", label: "All dates" },
@@ -211,6 +286,18 @@ export default function PaymentsPage() {
               { value: "month", label: "This month" },
             ]}
           />
+          <div className="w-[140px]">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              From
+            </label>
+            <TextInput value={customFrom} onChange={handleCustomFrom} type="date" />
+          </div>
+          <div className="w-[140px]">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              To
+            </label>
+            <TextInput value={customTo} onChange={handleCustomTo} type="date" />
+          </div>
           {adminView ? (
             <SelectInput
               value={userFilter}
@@ -320,6 +407,7 @@ export default function PaymentsPage() {
           onSuccess={() => {
             setShowNew(false);
             void refetch();
+            void queryClient.invalidateQueries({ queryKey: ["payments-summary"] });
           }}
         />
       </Modal>
